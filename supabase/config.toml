@@ -1,0 +1,10 @@
+project_id = "mggvdhdjkszehutfhmbl"
+
+[functions.categorize]
+verify_jwt = false
+
+[functions.analyze]
+verify_jwt = false
+
+[functions.parse-statement]
+verify_jwt = false
