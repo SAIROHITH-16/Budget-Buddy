@@ -10,8 +10,15 @@ interface MonthlySpendingChartProps {
 }
 
 export function MonthlySpendingChart({ transactions }: MonthlySpendingChartProps) {
-  const [timePeriod, setTimePeriod] = useState<TimePeriod>("monthly");
+  const [timePeriod, setTimePeriod] = useState<TimePeriod>(() => {
+    const saved = localStorage.getItem("budget_buddy_graph_range");
+    return (saved as TimePeriod) ?? "monthly";
+  });
   const [, setCurrencyUpdate] = useState(0);
+
+  useEffect(() => {
+    localStorage.setItem("budget_buddy_graph_range", timePeriod);
+  }, [timePeriod]);
 
   useEffect(() => {
     const handleCurrencyChange = () => setCurrencyUpdate(prev => prev + 1);
