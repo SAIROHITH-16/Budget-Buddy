@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { useToast } from "@/hooks/use-toast";
 import { Layout } from "@/components/Layout";
 import { TransactionForm } from "@/components/TransactionForm";
 import { TransactionEditModal } from "@/components/TransactionEditModal";
@@ -36,6 +37,8 @@ const Transactions = () => {
     totalRecords, totalPages, currentPage,
     addTransaction, updateTransaction, deleteTransaction, refetch,
   } = useTransactions();
+
+  const { toast } = useToast();
 
   const [editTx, setEditTx] = useState<Transaction | null>(null);
   const [deleteTxId, setDeleteTxId] = useState<string | null>(null);
@@ -402,9 +405,20 @@ const Transactions = () => {
       <DeleteConfirmDialog
         open={!!deleteTxId}
         onClose={() => setDeleteTxId(null)}
-        onConfirm={() => {
-          if (deleteTxId) deleteTransaction(deleteTxId);
-          setDeleteTxId(null);
+        onConfirm={async () => {
+          const idToDelete = deleteTxId;
+          setDeleteTxId(null); // close dialog immediately
+          if (!idToDelete) return;
+          try {
+            await deleteTransaction(idToDelete);
+            toast({ title: "Transaction deleted", description: "The transaction was removed successfully." });
+          } catch {
+            toast({
+              title: "Delete failed",
+              description: "Could not delete the transaction. Please try again.",
+              variant: "destructive",
+            });
+          }
         }}
       />
     </Layout>
