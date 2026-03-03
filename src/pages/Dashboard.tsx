@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Layout } from "@/components/Layout";
 import { StatCard } from "@/components/StatCard";
 import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
 import { CategoryPieChart } from "@/components/charts/CategoryPieChart";
 import { IncomeExpenseLineChart } from "@/components/charts/IncomeExpenseLineChart";
 import { MonthlySpendingChart } from "@/components/charts/MonthlySpendingChart";
@@ -209,57 +210,78 @@ const Dashboard = () => {
           </div>
         )}
 
-        {loading && <p className="text-muted-foreground text-sm">Loading...</p>}
-
         {/* ------------------------------------------------------------------ */}
         {/* Stat cards                                                          */}
         {/* ------------------------------------------------------------------ */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {/* Card 1: Money In (Total Deposits) */}
-          <StatCard
-            title="Money In"
-            value={fmtDeposits}
-            icon={<TrendingUp className="h-5 w-5 income-text" />}
-            variant="income"
-          />
+          {loading ? (
+            <>
+              <Skeleton className="h-28 rounded-xl" />
+              <Skeleton className="h-28 rounded-xl" />
+              <Skeleton className="h-28 rounded-xl" />
+            </>
+          ) : (
+            <>
+              {/* Card 1: Money In (Total Deposits) */}
+              <StatCard
+                title="Money In"
+                value={fmtDeposits}
+                icon={<TrendingUp className="h-5 w-5 income-text" />}
+                variant="income"
+              />
 
-          {/* Card 2: Money Out (Total Withdrawals) — embeds budget progress bar */}
-          <StatCard
-            title="Money Out"
-            value={fmtWithdrawals}
-            icon={<TrendingDown className="h-5 w-5 expense-text" />}
-            variant="expense"
-          >
-            {hasLimit && (
-              <div className="space-y-1.5">
-                <Progress
-                  value={spendPercent}
-                  className="h-2"
-                  indicatorClassName={progressColor}
-                />
-                <p className="text-xs text-muted-foreground tabular-nums">
-                  {fmtWithdrawals} / {formatCurrency(budget.monthlyLimit)}
-                  {" "}({Math.round(spentRatio)}%)
-                </p>
-              </div>
-            )}
-          </StatCard>
+              {/* Card 2: Money Out (Total Withdrawals) — embeds budget progress bar */}
+              <StatCard
+                title="Money Out"
+                value={fmtWithdrawals}
+                icon={<TrendingDown className="h-5 w-5 expense-text" />}
+                variant="expense"
+              >
+                {hasLimit && (
+                  <div className="space-y-1.5">
+                    <Progress
+                      value={spendPercent}
+                      className="h-2"
+                      indicatorClassName={progressColor}
+                    />
+                    <p className="text-xs text-muted-foreground tabular-nums">
+                      {fmtWithdrawals} / {formatCurrency(budget.monthlyLimit)}
+                      {" "}({Math.round(spentRatio)}%)
+                    </p>
+                  </div>
+                )}
+              </StatCard>
 
-          {/* Card 3: Net Cash Flow — green (+) when positive, red when negative */}
-          <StatCard
-            title="Net Cash Flow"
-            value={fmtNetFlow}
-            icon={<Wallet className={`h-5 w-5 ${netFlow >= 0 ? "income-text" : "expense-text"}`} />}
-            valueClassName={netFlow >= 0 ? "income-text" : "expense-text"}
-          />
+              {/* Card 3: Net Cash Flow — green (+) when positive, red when negative */}
+              <StatCard
+                title="Net Cash Flow"
+                value={fmtNetFlow}
+                icon={<Wallet className={`h-5 w-5 ${netFlow >= 0 ? "income-text" : "expense-text"}`} />}
+                valueClassName={netFlow >= 0 ? "income-text" : "expense-text"}
+              />
+            </>
+          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <CategoryPieChart data={categoryData} />
-          <IncomeExpenseLineChart data={incomeExpenseTrend} />
+          {loading ? (
+            <>
+              <Skeleton className="h-64 rounded-xl" />
+              <Skeleton className="h-64 rounded-xl" />
+            </>
+          ) : (
+            <>
+              <CategoryPieChart data={categoryData} />
+              <IncomeExpenseLineChart data={incomeExpenseTrend} />
+            </>
+          )}
         </div>
 
-        <MonthlySpendingChart transactions={transactions} />
+        {loading ? (
+          <Skeleton className="h-64 rounded-xl" />
+        ) : (
+          <MonthlySpendingChart transactions={transactions} />
+        )}
       </div>
     </Layout>
   );
