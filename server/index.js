@@ -29,11 +29,13 @@ const app = express();
 // origin so the app works whether opened via localhost or by LAN IP address.
 const LOCAL_ORIGIN_RE = /^http:\/\/(localhost|127\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)(:\d+)?$/;
 
-// Build the set of allowed production origins from CORS_ORIGIN env var.
-// Supports comma-separated list: "https://a.vercel.app,https://b.vercel.app"
-const ALLOWED_ORIGINS = new Set(
-  (CORS_ORIGIN || "").split(",").map((o) => o.trim()).filter(Boolean)
-);
+// Build the set of allowed production origins.
+// Includes the hardcoded primary Vercel domain plus any extras from CORS_ORIGIN env var
+// (comma-separated: "https://a.vercel.app,https://b.vercel.app").
+const ALLOWED_ORIGINS = new Set([
+  "https://budgetbuddy1.vercel.app",
+  ...(CORS_ORIGIN || "").split(",").map((o) => o.trim()).filter(Boolean),
+]);
 
 app.use(cors({
   origin: (origin, cb) => {
@@ -49,7 +51,7 @@ app.use(cors({
   },
   methods:        ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
-  credentials:    false,
+  credentials:    true,
 }));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
