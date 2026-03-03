@@ -172,16 +172,22 @@ export function useTransactions(options: UseTransactionsOptions = {}) {
   );
 
   // -------------------------------------------------------------------------
-  // UPDATE an existing transaction
+  // UPDATE an existing transaction — optimistic update
+  // Applies the change to the UI immediately; reverts if the server rejects it.
   // PUT /api/transactions/:id
-  // Body: { type, amount, category, description, date }
-  // The server verifies the JWT and confirms ownership (uid must match) before
-  // allowing the update.
   // -------------------------------------------------------------------------
   const updateTransaction = useCallback(
     async (id: string, data: Omit<Transaction, "id">): Promise<void> => {
-      setLoading(true);
       setError(null);
+      // Snapshot current list for rollback
+      let previous: Transaction[] = [];
+      // Apply optimistically
+      setTransactions((prev) => {
+        previous = prev;
+        return prev.map((t) =>
+          t.id === id ? { ...t, ...data } : t
+        );
+      });
       try {
         const response = await api.put<RawTransaction>(`/transactions/${id}`, {
           type: data.type,
@@ -190,11 +196,14 @@ export function useTransactions(options: UseTransactionsOptions = {}) {
           description: data.description,
           date: data.date,
         });
+        // Reconcile with server's canonical response
         const updated = mapRawToTransaction(response.data);
         setTransactions((prev) =>
           prev.map((t) => (t.id === id ? updated : t))
         );
       } catch (e: unknown) {
+        // Revert on failure
+        setTransactions(previous);
         const msg =
           (e as { response?: { data?: { message?: string } }; message?: string })
             ?.response?.data?.message ??
@@ -202,25 +211,30 @@ export function useTransactions(options: UseTransactionsOptions = {}) {
           "Failed to update transaction.";
         setError(msg);
         throw e;
-      } finally {
-        setLoading(false);
       }
     },
     []
   );
 
   // -------------------------------------------------------------------------
-  // DELETE a transaction
+  // DELETE a transaction — optimistic delete
+  // Removes the item from the UI immediately; restores it if the server fails.
   // DELETE /api/transactions/:id
-  // The server verifies ownership before deletion.
   // -------------------------------------------------------------------------
   const deleteTransaction = useCallback(async (id: string): Promise<void> => {
-    setLoading(true);
     setError(null);
+    // Snapshot for rollback
+    let previous: Transaction[] = [];
+    // Remove optimistically — instant UI update, no spinner
+    setTransactions((prev) => {
+      previous = prev;
+      return prev.filter((t) => t.id !== id);
+    });
     try {
       await api.delete(`/transactions/${id}`);
-      setTransactions((prev) => prev.filter((t) => t.id !== id));
     } catch (e: unknown) {
+      // Restore the deleted item on failure
+      setTransactions(previous);
       const msg =
         (e as { response?: { data?: { message?: string } }; message?: string })
           ?.response?.data?.message ??
@@ -228,8 +242,6 @@ export function useTransactions(options: UseTransactionsOptions = {}) {
         "Failed to delete transaction.";
       setError(msg);
       throw e;
-    } finally {
-      setLoading(false);
     }
   }, []);
 
