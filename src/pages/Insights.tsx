@@ -9,6 +9,7 @@ import {
   Loader2, ChevronLeft, ChevronRight, CalendarDays,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
@@ -269,9 +270,61 @@ const Insights = () => {
         )}
 
         {loading && !insights && (
-          <div className="glass-card p-12 flex flex-col items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-primary mb-3" />
-            <p className="text-muted-foreground text-sm">Analyzing your finances with AI...</p>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Summary card — full width */}
+            <div className="glass-card p-5 lg:col-span-2 space-y-3">
+              <Skeleton className="h-4 w-36" />
+              <Skeleton className="h-3.5 w-full" />
+              <Skeleton className="h-3.5 w-[90%]" />
+              <Skeleton className="h-3.5 w-[75%]" />
+            </div>
+            {/* Top categories card */}
+            <div className="glass-card p-5 space-y-4">
+              <Skeleton className="h-4 w-40" />
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Skeleton className="h-6 w-6 rounded-full" />
+                    <Skeleton className="h-3.5 w-24" />
+                  </div>
+                  <Skeleton className="h-3.5 w-16" />
+                </div>
+              ))}
+            </div>
+            {/* Month comparison card */}
+            <div className="glass-card p-5 space-y-4">
+              <Skeleton className="h-4 w-36" />
+              <div className="flex items-center gap-3">
+                <Skeleton className="h-8 w-8 rounded-lg" />
+                <div className="space-y-1.5">
+                  <Skeleton className="h-3.5 w-32" />
+                  <Skeleton className="h-3 w-24" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 rounded-lg bg-muted/50 space-y-1.5">
+                  <Skeleton className="h-3 w-16" />
+                  <Skeleton className="h-4 w-20" />
+                </div>
+                <div className="p-3 rounded-lg bg-muted/50 space-y-1.5">
+                  <Skeleton className="h-3 w-16" />
+                  <Skeleton className="h-4 w-20" />
+                </div>
+              </div>
+            </div>
+            {/* Suggestions card — full width */}
+            <div className="glass-card p-5 lg:col-span-2 space-y-3">
+              <Skeleton className="h-4 w-44" />
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-muted/30">
+                  <Skeleton className="h-6 w-6 rounded-full shrink-0" />
+                  <div className="flex-1 space-y-1.5">
+                    <Skeleton className="h-3.5 w-full" />
+                    <Skeleton className="h-3.5 w-[80%]" />
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
