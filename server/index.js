@@ -28,11 +28,23 @@ const app = express();
 // Allow any localhost, 127.x, or private-network (192.168.x / 10.x / 172.16-31.x)
 // origin so the app works whether opened via localhost or by LAN IP address.
 const LOCAL_ORIGIN_RE = /^http:\/\/(localhost|127\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)(:\d+)?$/;
+
+// Build the set of allowed production origins from CORS_ORIGIN env var.
+// Supports comma-separated list: "https://a.vercel.app,https://b.vercel.app"
+const ALLOWED_ORIGINS = new Set(
+  (CORS_ORIGIN || "").split(",").map((o) => o.trim()).filter(Boolean)
+);
+
 app.use(cors({
   origin: (origin, cb) => {
-    // Allow requests with no origin (curl/Postman) and any local/LAN origin
-    if (!origin || LOCAL_ORIGIN_RE.test(origin)) return cb(null, true);
-    // Unknown origin — reject cleanly (false, not an Error, to avoid 500)
+    // Allow requests with no origin (curl/Postman/server-to-server)
+    if (!origin) return cb(null, true);
+    // Allow any local/LAN origin (development)
+    if (LOCAL_ORIGIN_RE.test(origin)) return cb(null, true);
+    // Allow explicitly listed production origins
+    if (ALLOWED_ORIGINS.has(origin)) return cb(null, true);
+    // Reject everything else
+    console.warn(`[CORS] Blocked origin: ${origin}`);
     cb(null, false);
   },
   methods:        ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
