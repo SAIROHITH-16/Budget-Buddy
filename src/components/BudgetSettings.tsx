@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { getCurrencySymbol } from "@/utils/calculations";
 
 // ---------------------------------------------------------------------------
@@ -22,6 +23,9 @@ interface Budget {
 // ---------------------------------------------------------------------------
 export function BudgetSettings() {
   const [budget, setBudget] = useState<Budget>({ monthlyLimit: 0, alertThreshold: 80 });
+  const [enabled, setEnabled]   = useState<boolean>(
+    () => localStorage.getItem("budgetEnabled") !== "false"
+  );
   const [loading, setLoading]   = useState(true);
   const [saving, setSaving]     = useState(false);
   const [saved, setSaved]       = useState(false);
@@ -60,6 +64,25 @@ export function BudgetSettings() {
     window.addEventListener("currencyChange", handleCurrencyChange);
     return () => window.removeEventListener("currencyChange", handleCurrencyChange);
   }, []);
+
+  // -------------------------------------------------------------------------
+  // Toggle handler — persist preference and notify Dashboard
+  // -------------------------------------------------------------------------
+  const handleToggle = async (on: boolean) => {
+    setEnabled(on);
+    localStorage.setItem("budgetEnabled", String(on));
+    if (!on) {
+      // Save limit as 0 to disable budget tracking on the backend too
+      try {
+        const { data } = await api.post<Budget>("/budget", {
+          monthlyLimit:   0,
+          alertThreshold: budget.alertThreshold,
+        });
+        setBudget(data);
+        window.dispatchEvent(new CustomEvent("budgetChange", { detail: data }));
+      } catch { /* silently ignore */ }
+    }
+  };
 
   // -------------------------------------------------------------------------
   // Save handler — POST /api/budget (upsert on the backend)
@@ -109,16 +132,40 @@ export function BudgetSettings() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Wallet className="h-5 w-5 text-primary" />
-          Budget Settings
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <Wallet className="h-5 w-5 text-primary" />
+            Budget Settings
+          </CardTitle>
+          <div className="flex items-center gap-2">
+            <span className={`text-xs font-semibold ${
+              enabled ? "text-emerald-600" : "text-muted-foreground"
+            }`}>
+              {enabled ? "ON" : "OFF"}
+            </span>
+            <Switch
+              checked={enabled}
+              onCheckedChange={handleToggle}
+              aria-label="Enable budget tracking"
+            />
+          </div>
+        </div>
         <CardDescription>
-          Set your monthly spending limit and choose when to be alerted.
+          {enabled
+            ? "Set your monthly spending limit and choose when to be alerted."
+            : "Budget tracking is disabled. Toggle on to set a spending limit."}
         </CardDescription>
       </CardHeader>
 
       <CardContent className="space-y-6">
+        {!enabled ? (
+          <div className="flex flex-col items-center justify-center py-6 gap-2 text-muted-foreground">
+            <Wallet className="h-10 w-10 opacity-25" />
+            <p className="text-sm">Budget tracking is off.</p>
+            <p className="text-xs">Toggle the switch above to enable it.</p>
+          </div>
+        ) : (
+          <>
         {/* ------------------------------------------------------------------ */}
         {/* Monthly Limit                                                       */}
         {/* ------------------------------------------------------------------ */}
@@ -205,6 +252,8 @@ export function BudgetSettings() {
           )}
           {saving ? "Saving…" : "Save Budget"}
         </Button>
+          </>
+        )}
       </CardContent>
     </Card>
   );
