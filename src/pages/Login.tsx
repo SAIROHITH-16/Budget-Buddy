@@ -165,8 +165,8 @@ export default function Login() {
         <div className="mb-8 text-center">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl"
             style={{
-              background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
-              boxShadow: "0 4px 20px rgba(99,102,241,0.45), inset 0 1px 0 rgba(255,255,255,0.25)",
+              background: "linear-gradient(135deg, #fbbf24, #f97316)",
+              boxShadow: "0 4px 20px rgba(249,115,22,0.40), inset 0 1px 0 rgba(255,255,255,0.25)",
             }}
           >
             {/* Wallet icon – inline SVG, no icon library dependency */}
