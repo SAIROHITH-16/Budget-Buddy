@@ -221,10 +221,15 @@ export default function Register() {
         {/* Header                                                            */}
         {/* ---------------------------------------------------------------- */}
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full"
+            style={{
+              background: "linear-gradient(135deg, #38bdf8, #818cf8)",
+              boxShadow: "0 4px 20px rgba(56,189,248,0.35), inset 0 1px 0 rgba(255,255,255,0.25)",
+            }}
+          >
             <svg
               xmlns="http://www.w3.org/2000/svg"
-              className="h-7 w-7 text-primary"
+              className="h-7 w-7 text-white"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"

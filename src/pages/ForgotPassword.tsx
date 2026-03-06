@@ -67,8 +67,8 @@ export default function ForgotPassword() {
       className="flex min-h-screen items-center justify-center bg-background px-4"
       style={{
         backgroundImage: [
-          "radial-gradient(ellipse 80% 50% at 10% 0%, hsl(262 83% 58% / 0.12) 0%, transparent 60%)",
-          "radial-gradient(ellipse 55% 40% at 90% 100%, hsl(38 92% 50% / 0.10) 0%, transparent 55%)",
+          "radial-gradient(ellipse 80% 50% at 10% 0%, hsl(199 89% 75% / 0.18) 0%, transparent 60%)",
+          "radial-gradient(ellipse 55% 40% at 90% 100%, hsl(250 80% 80% / 0.15) 0%, transparent 55%)",
         ].join(", ")
       }}
     >
@@ -89,8 +89,8 @@ export default function ForgotPassword() {
           <div 
             className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl"
             style={{
-              background: "linear-gradient(135deg, hsl(262 83% 58%), hsl(300 70% 55%))",
-              boxShadow: "0 4px 20px rgba(124,58,237,0.40), inset 0 1px 0 hsl(0 0% 100% / 0.25)",
+              background: "linear-gradient(135deg, #38bdf8, #818cf8)",
+              boxShadow: "0 4px 20px rgba(56,189,248,0.40), inset 0 1px 0 hsl(0 0% 100% / 0.25)",
             }}
           >
             {/* Key icon */}
