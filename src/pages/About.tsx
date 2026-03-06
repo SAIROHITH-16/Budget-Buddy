@@ -72,7 +72,7 @@ const TECH_STACKS = [
 
 export default function About() {
   return (
-    <div className="min-h-screen bg-fixed" style={{ background: "radial-gradient(ellipse 85% 65% at 0% 0%, rgba(125,211,252,0.32) 0%, transparent 60%), radial-gradient(ellipse 65% 55% at 100% 0%, rgba(129,140,248,0.30) 0%, transparent 58%), radial-gradient(ellipse 75% 65% at 50% 55%, rgba(196,181,254,0.18) 0%, transparent 65%), radial-gradient(ellipse 60% 55% at 0% 100%, rgba(103,232,249,0.26) 0%, transparent 55%), radial-gradient(ellipse 70% 55% at 100% 100%, rgba(110,231,183,0.24) 0%, transparent 58%), linear-gradient(150deg, #f0f9ff 0%, #eef2ff 28%, #f5f3ff 52%, #ecfef9 76%, #f0fdfa 100%)", backgroundAttachment: "fixed" }}>
+    <div className="min-h-screen bg-fixed" style={{ background: "linear-gradient(135deg, #e0f2fe 0%, #ede9fe 100%)", backgroundAttachment: "fixed" }}>
       <Navbar />
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16 space-y-24">
