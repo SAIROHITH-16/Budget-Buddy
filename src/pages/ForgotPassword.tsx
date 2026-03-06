@@ -89,8 +89,8 @@ export default function ForgotPassword() {
           <div 
             className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl"
             style={{
-              background: "linear-gradient(135deg, #f9a8d4, #a78bfa)",
-              boxShadow: "0 4px 20px rgba(167,139,250,0.45), inset 0 1px 0 hsl(0 0% 100% / 0.25)",
+              background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
+              boxShadow: "0 4px 20px rgba(99,102,241,0.45), inset 0 1px 0 hsl(0 0% 100% / 0.25)",
             }}
           >
             {/* Key icon */}
