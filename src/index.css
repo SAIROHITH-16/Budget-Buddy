@@ -6,13 +6,14 @@
 
 /*
   ============================================================
-  BUDGET BUDDY — ROSE GOLD → TEAL AURORA THEME
+  BUDGET BUDDY — COOL BLUE-INDIGO AURORA THEME
   ============================================================
-  Rose Gold        #ffd6e0   warm start
-  Peach Amber      #ffecd2   mid warmth
-  Soft Lavender    #e8d5f5   violet wash
-  Sky Teal         #c8f0f8   cool mid
-  Emerald Mint     #d0fae8   fresh end
+  Sky Blue         #bae6fd   cool glow top-left
+  Indigo Haze      #c7d2fe   dreamy top-right
+  Soft Violet      #ddd6fe   center bloom
+  Cyan Mint        #a5f3fc   bottom-left pop
+  Emerald          #6ee7b7   bottom-right fresh
+  Base             #f0f9ff → #eef2ff → #f5f3ff → #ecfef9
   Brand Violet     #7c3aed   primary
   ============================================================
 */
@@ -134,24 +135,24 @@
     @apply text-foreground font-sans antialiased;
     font-family: 'Nunito Sans', system-ui, sans-serif;
     background:
-      radial-gradient(ellipse 80% 60% at 0%   0%,   rgba(255, 154, 139, 0.28) 0%, transparent 60%),
-      radial-gradient(ellipse 60% 50% at 100% 0%,   rgba(167, 139, 250, 0.28) 0%, transparent 55%),
-      radial-gradient(ellipse 70% 60% at 50%  50%,  rgba(250, 204,  21, 0.12) 0%, transparent 65%),
-      radial-gradient(ellipse 60% 55% at 0%   100%, rgba(52,  211, 153, 0.22) 0%, transparent 55%),
-      radial-gradient(ellipse 70% 50% at 100% 100%, rgba(56,  189, 248, 0.22) 0%, transparent 55%),
-      linear-gradient(160deg, #fff1f2 0%, #fdf4ff 25%, #fffbeb 50%, #f0fdf4 75%, #ecfeff 100%);
+      radial-gradient(ellipse 85% 65% at 0%   0%,   rgba(125, 211, 252, 0.32) 0%, transparent 60%),
+      radial-gradient(ellipse 65% 55% at 100% 0%,   rgba(129, 140, 248, 0.30) 0%, transparent 58%),
+      radial-gradient(ellipse 75% 65% at 50%  55%,  rgba(196, 181, 254, 0.18) 0%, transparent 65%),
+      radial-gradient(ellipse 60% 55% at 0%   100%, rgba(103, 232, 249, 0.26) 0%, transparent 55%),
+      radial-gradient(ellipse 70% 55% at 100% 100%, rgba(110, 231, 183, 0.24) 0%, transparent 58%),
+      linear-gradient(150deg, #f0f9ff 0%, #eef2ff 28%, #f5f3ff 52%, #ecfef9 76%, #f0fdfa 100%);
     background-attachment: fixed;
     min-height: 100vh;
   }
 
   .dark body {
     background:
-      radial-gradient(ellipse 80% 60% at 0%   0%,   rgba(255, 154, 139, 0.28) 0%, transparent 60%),
-      radial-gradient(ellipse 60% 50% at 100% 0%,   rgba(167, 139, 250, 0.28) 0%, transparent 55%),
-      radial-gradient(ellipse 70% 60% at 50%  50%,  rgba(250, 204,  21, 0.12) 0%, transparent 65%),
-      radial-gradient(ellipse 60% 55% at 0%   100%, rgba(52,  211, 153, 0.22) 0%, transparent 55%),
-      radial-gradient(ellipse 70% 50% at 100% 100%, rgba(56,  189, 248, 0.22) 0%, transparent 55%),
-      linear-gradient(160deg, #fff1f2 0%, #fdf4ff 25%, #fffbeb 50%, #f0fdf4 75%, #ecfeff 100%);
+      radial-gradient(ellipse 85% 65% at 0%   0%,   rgba(125, 211, 252, 0.32) 0%, transparent 60%),
+      radial-gradient(ellipse 65% 55% at 100% 0%,   rgba(129, 140, 248, 0.30) 0%, transparent 58%),
+      radial-gradient(ellipse 75% 65% at 50%  55%,  rgba(196, 181, 254, 0.18) 0%, transparent 65%),
+      radial-gradient(ellipse 60% 55% at 0%   100%, rgba(103, 232, 249, 0.26) 0%, transparent 55%),
+      radial-gradient(ellipse 70% 55% at 100% 100%, rgba(110, 231, 183, 0.24) 0%, transparent 58%),
+      linear-gradient(150deg, #f0f9ff 0%, #eef2ff 28%, #f5f3ff 52%, #ecfef9 76%, #f0fdfa 100%);
     background-attachment: fixed;
   }
 
