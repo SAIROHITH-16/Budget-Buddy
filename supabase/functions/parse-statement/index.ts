@@ -309,12 +309,43 @@ Hard rules:
 4. Return ONLY the raw JSON array — no markdown fences, no explanation, nothing else.`;
 
 // ===========================================================================
+// Keyword-based local fallback — zero API calls, works when AI is unavailable
+// ===========================================================================
+const KEYWORD_MAP: Array<{ category: string; words: string[] }> = [
+  { category: "Salary",        words: ["salary","payroll","wages","wage","paycheck","direct deposit","neft salary","sal credit"] },
+  { category: "Freelance",     words: ["freelance","upwork","fiverr","toptal","contractor","consulting fee","invoice"] },
+  { category: "Refund",        words: ["refund","cashback","reversal","return credit","reversal credit"] },
+  { category: "Rent",          words: ["rent","lease","landlord","housing","apartment","flat rent","pg rent"] },
+  { category: "Groceries",     words: ["grocery","groceries","supermarket","bigbasket","blinkit","zepto","dmart","walmart","costco","sainsbury","tesco","aldi","reliance fresh","more supermarket","jiomart","nature basket"] },
+  { category: "Utilities",     words: ["electricity","water bill","gas bill","broadband","wifi","telephone","landline","municipality","bsnl","airtel","jio","vodafone","vi","utility","bescom","msedcl","tneb","bwssb"] },
+  { category: "Transport",     words: ["uber","ola","lyft","taxi","cab","metro","railway","irctc","rapido","auto rickshaw","fuel","petrol","diesel","parking","toll","fastag","shell","hp petrol"] },
+  { category: "Food",          words: ["restaurant","cafe","coffee","starbucks","mcdonald","kfc","domino","pizza","subway","swiggy","zomato","dining","biryani","burger","sushi","dunkin","bakery"] },
+  { category: "Entertainment", words: ["netflix","amazon prime","hotstar","disney","spotify","youtube premium","hulu","apple tv","cinema","movie","theatre","concert","gaming","steam","playstation","xbox"] },
+  { category: "Health",        words: ["hospital","clinic","doctor","pharmacy","medicine","medical","dental","dentist","lab test","diagnostics","1mg","netmeds","practo","apollo","gym","fitness"] },
+  { category: "Education",     words: ["school","college","university","tuition","course","udemy","coursera","edx","byju","unacademy","skillshare","exam fee"] },
+  { category: "Shopping",      words: ["amazon","flipkart","myntra","ajio","nykaa","meesho","ebay","snapdeal","h&m","zara","uniqlo","mall","clothing","fashion","shoes"] },
+  { category: "Subscriptions", words: ["subscription","monthly plan","annual plan","membership","saas","adobe","microsoft 365","dropbox","notion","slack","zoom"] },
+  { category: "Insurance",     words: ["insurance","lic","premium","policy","term plan","health cover","motor insurance","star health","icici prudential","hdfc life"] },
+  { category: "Savings",       words: ["savings","fixed deposit","recurring deposit","ppf","nps","atal pension"] },
+  { category: "Investment",    words: ["investment","mutual fund","sip","zerodha","groww","upstox","stocks","shares","nifty","sensex","ipo","demat","brokerage","crypto","bitcoin"] },
+  { category: "Transfer",      words: ["upi","neft","imps","rtgs","transfer","sent to","received from","p2p"] },
+];
+
+function keywordCategory(description: string): string {
+  const lower = description.toLowerCase();
+  for (const { category, words } of KEYWORD_MAP) {
+    if (words.some((w) => lower.includes(w))) return category;
+  }
+  return "Other";
+}
+
+// ===========================================================================
 // Helper: call GitHub Models (OpenAI-compatible GPT-4o)
 // ===========================================================================
 
 async function callGPT(systemPrompt: string, userContent: string): Promise<string> {
   const GITHUB_TOKEN = Deno.env.get("GITHUB_TOKEN");
-  if (!GITHUB_TOKEN) throw new Error("GITHUB_TOKEN not set in Supabase secrets");
+  if (!GITHUB_TOKEN) throw Object.assign(new Error("GITHUB_TOKEN not set in Supabase secrets"), { status: 503 });
 
   const res = await fetch(
     "https://models.inference.ai.azure.com/chat/completions",
@@ -339,7 +370,11 @@ async function callGPT(systemPrompt: string, userContent: string): Promise<strin
     const status = res.status;
     if (status === 429) throw Object.assign(new Error("Rate limited by AI provider"), { status: 429 });
     if (status === 402) throw Object.assign(new Error("AI credits exhausted"),        { status: 402 });
-    throw new Error(`GitHub Models API error: ${status}`);
+    if (status === 401) throw Object.assign(
+      new Error("GitHub Models 401: token missing or lacks Models access — set GITHUB_TOKEN in Supabase secrets"),
+      { status: 401 }
+    );
+    throw Object.assign(new Error(`GitHub Models API error: ${status}`), { status });
   }
 
   const data = await res.json();
@@ -473,19 +508,23 @@ serve(async (req) => {
     }
 
     // ── STAGE 2: AI categorization on pre-typed clean data ──────────────────
-    const aiRaw = await callGPT(
-      CATEGORIZE_PROMPT,
-      JSON.stringify(parsedTransactions)
-    );
-
-    // ── Merge AI categories; deterministic values are the source of truth ────
     let transactions: Transaction[];
     try {
-      transactions = mergeWithBaseline(aiRaw, parsedTransactions);
-    } catch (parseErr) {
-      console.error("[parse-statement] Failed to parse AI JSON — using 'Other' for all categories:", aiRaw);
-      // Graceful degradation: return mathematically correct data with fallback category
-      transactions = parsedTransactions.map(t => ({ ...t, category: "Other" as const }));
+      const aiRaw = await callGPT(
+        CATEGORIZE_PROMPT,
+        JSON.stringify(parsedTransactions)
+      );
+      try {
+        transactions = mergeWithBaseline(aiRaw, parsedTransactions);
+      } catch (parseErr) {
+        console.error("[parse-statement] Failed to parse AI JSON — using keyword fallback:", aiRaw);
+        transactions = parsedTransactions.map(t => ({ ...t, category: keywordCategory(t.description) }));
+      }
+    } catch (aiErr: any) {
+      // AI unavailable (no token, 401, rate limit, network error, etc.)
+      // Fall back to keyword matching — PDF import always succeeds
+      console.warn("[parse-statement] AI unavailable, using keyword fallback:", aiErr?.message);
+      transactions = parsedTransactions.map(t => ({ ...t, category: keywordCategory(t.description) }));
     }
 
     if (transactions.length === 0) {
