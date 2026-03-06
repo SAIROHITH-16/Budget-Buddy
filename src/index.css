@@ -6,15 +6,14 @@
 
 /*
   ============================================================
-  BUDGET BUDDY — DEEP AURORA PREMIUM THEME
+  BUDGET BUDDY — ROSE GOLD → TEAL AURORA THEME
   ============================================================
-  Midnight Indigo  #0f0c29   gradient start
-  Deep Violet      #302b63   gradient mid
-  Electric Blue    #24243e   gradient end
+  Rose Gold        #ffd6e0   warm start
+  Peach Amber      #ffecd2   mid warmth
+  Soft Lavender    #e8d5f5   violet wash
+  Sky Teal         #c8f0f8   cool mid
+  Emerald Mint     #d0fae8   fresh end
   Brand Violet     #7c3aed   primary
-  Sky Accent       #06b6d4   cyan accent
-  Emerald          #059669   income
-  Rose Red         #e11d48   expense
   ============================================================
 */
 
@@ -135,22 +134,24 @@
     @apply text-foreground font-sans antialiased;
     font-family: 'Nunito Sans', system-ui, sans-serif;
     background:
-      radial-gradient(ellipse at 20% 10%,  rgba(124, 58, 237, 0.18) 0%, transparent 55%),
-      radial-gradient(ellipse at 80% 5%,   rgba(6, 182, 212, 0.14)  0%, transparent 50%),
-      radial-gradient(ellipse at 60% 80%,  rgba(99, 102, 241, 0.12) 0%, transparent 60%),
-      radial-gradient(ellipse at 10% 90%,  rgba(168, 85, 247, 0.10) 0%, transparent 50%),
-      linear-gradient(145deg, #f8f6ff 0%, #eef2ff 30%, #e0f2fe 60%, #f0fdf4 85%, #fefce8 100%);
+      radial-gradient(ellipse 80% 60% at 0%   0%,   rgba(255, 154, 139, 0.28) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 50% at 100% 0%,   rgba(167, 139, 250, 0.28) 0%, transparent 55%),
+      radial-gradient(ellipse 70% 60% at 50%  50%,  rgba(250, 204,  21, 0.12) 0%, transparent 65%),
+      radial-gradient(ellipse 60% 55% at 0%   100%, rgba(52,  211, 153, 0.22) 0%, transparent 55%),
+      radial-gradient(ellipse 70% 50% at 100% 100%, rgba(56,  189, 248, 0.22) 0%, transparent 55%),
+      linear-gradient(160deg, #fff1f2 0%, #fdf4ff 25%, #fffbeb 50%, #f0fdf4 75%, #ecfeff 100%);
     background-attachment: fixed;
     min-height: 100vh;
   }
 
   .dark body {
     background:
-      radial-gradient(ellipse at 20% 10%,  rgba(124, 58, 237, 0.18) 0%, transparent 55%),
-      radial-gradient(ellipse at 80% 5%,   rgba(6, 182, 212, 0.14)  0%, transparent 50%),
-      radial-gradient(ellipse at 60% 80%,  rgba(99, 102, 241, 0.12) 0%, transparent 60%),
-      radial-gradient(ellipse at 10% 90%,  rgba(168, 85, 247, 0.10) 0%, transparent 50%),
-      linear-gradient(145deg, #f8f6ff 0%, #eef2ff 30%, #e0f2fe 60%, #f0fdf4 85%, #fefce8 100%);
+      radial-gradient(ellipse 80% 60% at 0%   0%,   rgba(255, 154, 139, 0.28) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 50% at 100% 0%,   rgba(167, 139, 250, 0.28) 0%, transparent 55%),
+      radial-gradient(ellipse 70% 60% at 50%  50%,  rgba(250, 204,  21, 0.12) 0%, transparent 65%),
+      radial-gradient(ellipse 60% 55% at 0%   100%, rgba(52,  211, 153, 0.22) 0%, transparent 55%),
+      radial-gradient(ellipse 70% 50% at 100% 100%, rgba(56,  189, 248, 0.22) 0%, transparent 55%),
+      linear-gradient(160deg, #fff1f2 0%, #fdf4ff 25%, #fffbeb 50%, #f0fdf4 75%, #ecfeff 100%);
     background-attachment: fixed;
   }
 
