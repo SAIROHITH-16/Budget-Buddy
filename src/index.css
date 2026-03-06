@@ -6,11 +6,10 @@
 
 /*
   ============================================================
-  BUDGET BUDDY — PEACH → LILAC → PERIWINKLE GRADIENT
+  BUDGET BUDDY — ROSE WHITE → ICY MINT
   ============================================================
-  Champagne Peach  #ffecd2
-  Soft Lilac       #e8d5fb
-  Periwinkle Blue  #c3dafe
+  Rose White       #fff1f2
+  Icy Mint         #f0fdf4
   Brand Violet     #7c3aed   primary
   ============================================================
 */
@@ -131,13 +130,13 @@
   body {
     @apply text-foreground font-sans antialiased;
     font-family: 'Nunito Sans', system-ui, sans-serif;
-    background: linear-gradient(135deg, #ffecd2 0%, #e8d5fb 50%, #c3dafe 100%);
+    background: linear-gradient(135deg, #fff1f2 0%, #f0fdf4 100%);
     background-attachment: fixed;
     min-height: 100vh;
   }
 
   .dark body {
-    background: linear-gradient(135deg, #ffecd2 0%, #e8d5fb 50%, #c3dafe 100%);
+    background: linear-gradient(135deg, #fff1f2 0%, #f0fdf4 100%);
     background-attachment: fixed;
   }
 

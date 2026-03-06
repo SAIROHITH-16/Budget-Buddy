@@ -141,8 +141,8 @@ export default function Login() {
     <div className="flex min-h-screen items-center justify-center bg-transparent px-4"
       style={{
         backgroundImage: [
-          "radial-gradient(ellipse 80% 50% at 10% 0%, rgba(255,180,120,0.18) 0%, transparent 60%)",
-          "radial-gradient(ellipse 55% 40% at 90% 100%, rgba(165,130,250,0.18) 0%, transparent 55%)",
+          "radial-gradient(ellipse 80% 50% at 10% 0%, rgba(253,164,175,0.15) 0%, transparent 60%)",
+          "radial-gradient(ellipse 55% 40% at 90% 100%, rgba(110,231,183,0.15) 0%, transparent 55%)",
         ].join(", ")
       }}
     >
@@ -165,8 +165,8 @@ export default function Login() {
         <div className="mb-8 text-center">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl"
             style={{
-              background: "linear-gradient(135deg, #10b981, #059669)",
-              boxShadow: "0 4px 20px rgba(5,150,105,0.35), inset 0 1px 0 rgba(255,255,255,0.20)",
+              background: "linear-gradient(135deg, #0891b2, #0f766e)",
+              boxShadow: "0 4px 20px rgba(8,145,178,0.40), inset 0 1px 0 rgba(255,255,255,0.20)",
             }}
           >
             {/* Wallet icon – inline SVG, no icon library dependency */}

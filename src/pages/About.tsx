@@ -72,7 +72,7 @@ const TECH_STACKS = [
 
 export default function About() {
   return (
-    <div className="min-h-screen bg-fixed" style={{ background: "linear-gradient(135deg, #ffecd2 0%, #e8d5fb 50%, #c3dafe 100%)", backgroundAttachment: "fixed" }}>
+    <div className="min-h-screen bg-fixed" style={{ background: "linear-gradient(135deg, #fff1f2 0%, #f0fdf4 100%)", backgroundAttachment: "fixed" }}>
       <Navbar />
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16 space-y-24">
