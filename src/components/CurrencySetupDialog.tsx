@@ -45,12 +45,11 @@ export function CurrencySetupDialog() {
   const [currency, setCurrency] = useState<string>("USD");
 
   useEffect(() => {
-    // Check if user has already set currency
-    const savedCurrency = localStorage.getItem("preferredCurrency");
-    const setupComplete = localStorage.getItem("currencySetupComplete");
-    
-    // Show dialog only if currency hasn't been set up
-    if (!savedCurrency && !setupComplete) {
+    // Only show the dialog when the user has just registered for the first time.
+    // The "showCurrencySetup" flag is written by Register.tsx right before
+    // navigating to the dashboard, so it is present only on brand-new sign-ups.
+    const shouldShow = localStorage.getItem("showCurrencySetup") === "true";
+    if (shouldShow) {
       setOpen(true);
     }
   }, []);
@@ -58,7 +57,8 @@ export function CurrencySetupDialog() {
   const handleSave = () => {
     // Save currency preference
     localStorage.setItem("preferredCurrency", currency);
-    localStorage.setItem("currencySetupComplete", "true");
+    // Clear the one-time flag so the dialog never shows again for this user
+    localStorage.removeItem("showCurrencySetup");
     
     // Dispatch event to notify other components
     window.dispatchEvent(new CustomEvent("currencyChange", { detail: currency }));

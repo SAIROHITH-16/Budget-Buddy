@@ -156,6 +156,10 @@ export default function Register() {
         console.error("Failed to save user profile to database:", dbError);
       }
 
+      // Mark that this is a brand-new registration so the currency
+      // setup dialog shows exactly once on the first dashboard visit.
+      localStorage.setItem("showCurrencySetup", "true");
+
       // Navigate to dashboard on successful registration
       navigate("/dashboard", { replace: true });
 
@@ -184,6 +188,12 @@ export default function Register() {
     setIsGoogleSubmitting(true);
     try {
       await signInGoogle();
+      // For Google sign-in, show currency setup only if this is a new account
+      // (a simple check on whether preferredCurrency is already saved works for
+      // all cases — returning users will already have this key set).
+      if (!localStorage.getItem("preferredCurrency")) {
+        localStorage.setItem("showCurrencySetup", "true");
+      }
       navigate("/dashboard", { replace: true });
       // Google accounts have no phone by default — nudge user to add one
       setTimeout(() => {

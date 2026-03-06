@@ -70,13 +70,37 @@ Data:
 
 Return ONLY the JSON. No explanation, no markdown.`;
 
-    let content = await callGPT([
-      { role: "system", content: "You are a financial analyst AI. Return ONLY valid JSON. No markdown, no code fences, no extra text." },
-      { role: "user", content: prompt },
-    ], 0.3);
-
-    // Strip code fences if the model wraps the response
-    content = content.replace(/^```json?\s*/i, "").replace(/\s*```$/i, "");
+    let content;
+    try {
+      content = await callGPT([
+        { role: "system", content: "You are a financial analyst AI. Return ONLY valid JSON. No markdown, no code fences, no extra text." },
+        { role: "user", content: prompt },
+      ], 0.3);
+      // Strip code fences if the model wraps the response
+      content = content.replace(/^```json?\s*/i, "").replace(/\s*```$/i, "");
+    } catch (aiErr) {
+      console.warn("[insights/analyze] AI unavailable, returning fallback insights:", aiErr.message);
+      // Return a useful fallback so the page doesn’t break
+      const sortedCats = Object.entries(categories).sort((a, b) => b[1] - a[1]).slice(0, 3);
+      return res.json({
+        summary: `In ${month}, you spent $${totalExpense.toFixed(2)} and earned $${totalIncome.toFixed(2)}.`,
+        top_categories: sortedCats.map(([name, amount]) => ({ name, amount })),
+        saving_suggestions: [
+          "Review your largest spending category for potential cuts.",
+          "Set a monthly budget limit for discretionary spending.",
+          "Consider automating savings transfers.",
+        ],
+        month_comparison: {
+          current_expense: totalExpense,
+          previous_expense: prevTotalExpense,
+          change_percent: prevTotalExpense > 0
+            ? Math.round(((totalExpense - prevTotalExpense) / prevTotalExpense) * 100)
+            : 0,
+          direction: totalExpense > prevTotalExpense ? "up" : totalExpense < prevTotalExpense ? "down" : "same",
+        },
+        _aiUnavailable: true,
+      });
+    }
 
     let insights;
     try {
@@ -151,8 +175,14 @@ router.post("/categorize-batch", async (req, res) => {
     return res.json({ categories });
   } catch (err) {
     console.error("[insights/categorize-batch]", err);
-    const status = err.status || 500;
-    return res.status(status).json({ error: err.message || "Unknown error" });
+    // Fall back: return "Uncategorized" for every description so the import
+    // succeeds even when the GitHub Token is missing or expired.
+    const count = Array.isArray(req.body?.descriptions) ? req.body.descriptions.length : 0;
+    return res.json({
+      categories: Array(count).fill("Uncategorized"),
+      _aiUnavailable: true,
+      _error: err.message,
+    });
   }
 });
 
