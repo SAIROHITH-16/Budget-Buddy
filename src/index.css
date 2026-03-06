@@ -6,10 +6,11 @@
 
 /*
   ============================================================
-  BUDGET BUDDY — SKY BLUE → LAVENDER GRADIENT
+  BUDGET BUDDY — PEACH → LILAC → PERIWINKLE GRADIENT
   ============================================================
-  Sky Blue         #e0f2fe
-  Soft Lavender    #ede9fe
+  Champagne Peach  #ffecd2
+  Soft Lilac       #e8d5fb
+  Periwinkle Blue  #c3dafe
   Brand Violet     #7c3aed   primary
   ============================================================
 */
@@ -130,13 +131,13 @@
   body {
     @apply text-foreground font-sans antialiased;
     font-family: 'Nunito Sans', system-ui, sans-serif;
-    background: linear-gradient(135deg, #e0f2fe 0%, #ede9fe 100%);
+    background: linear-gradient(135deg, #ffecd2 0%, #e8d5fb 50%, #c3dafe 100%);
     background-attachment: fixed;
     min-height: 100vh;
   }
 
   .dark body {
-    background: linear-gradient(135deg, #e0f2fe 0%, #ede9fe 100%);
+    background: linear-gradient(135deg, #ffecd2 0%, #e8d5fb 50%, #c3dafe 100%);
     background-attachment: fixed;
   }
 

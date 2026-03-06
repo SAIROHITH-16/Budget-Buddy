@@ -223,8 +223,8 @@ export default function Register() {
         <div className="mb-8 text-center">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full"
             style={{
-              background: "linear-gradient(135deg, #38bdf8, #818cf8)",
-              boxShadow: "0 4px 20px rgba(56,189,248,0.35), inset 0 1px 0 rgba(255,255,255,0.25)",
+              background: "linear-gradient(135deg, #f9a8d4, #a78bfa)",
+              boxShadow: "0 4px 20px rgba(167,139,250,0.40), inset 0 1px 0 rgba(255,255,255,0.25)",
             }}
           >
             <svg
