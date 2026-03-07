@@ -3,18 +3,21 @@
 // MongoDB removed — all storage is local via better-sqlite3.
 //
 // Routes:
-//   POST  /api/users/profile      → create or update user profile
-//   GET   /api/users/profile      → retrieve profile (protected)
-//   POST  /api/users/send-otp     → generate & email a 6-digit OTP
-//   POST  /api/users/verify-email → validate OTP and mark user as verified
+//   POST  /api/users/profile         → create or update user profile
+//   GET   /api/users/profile         → retrieve profile (protected)
+//   POST  /api/users/send-otp        → generate & email a 6-digit OTP
+//   POST  /api/users/verify-email    → validate email OTP
+//   POST  /api/users/send-phone-otp  → generate & SMS a 6-digit OTP
+//   POST  /api/users/verify-phone    → validate phone OTP
 
 "use strict";
 
-const express        = require("express");
-const { randomUUID } = require("crypto");
-const { getDb }      = require("../lib/db");
+const express          = require("express");
+const { randomUUID }   = require("crypto");
+const { getDb }        = require("../lib/db");
 const { sendOtpEmail } = require("../lib/mailer");
-const verifyToken    = require("../middleware/verifyToken");
+const { sendOtpSms }   = require("../lib/sms");
+const verifyToken      = require("../middleware/verifyToken");
 
 const router = express.Router();
 
@@ -236,6 +239,80 @@ router.post("/verify-email", (req, res) => {
   } catch (err) {
     console.error("[users] POST /verify-email error:", err);
     return res.status(500).json({ success: false, error: "Verification failed.", message: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/users/send-phone-otp
+// Generates a 6-digit OTP, saves it to the user row (10-min expiry),
+// and sends an SMS via Twilio to the user's phone number.
+//
+// Body: { phone }  — E.164 format recommended (e.g. +911234567890)
+// ---------------------------------------------------------------------------
+router.post("/send-phone-otp", async (req, res) => {
+  try {
+    const raw = (req.body.phone || "").toString().trim();
+    if (!raw) return res.status(400).json({ success: false, error: "phone is required" });
+
+    // Normalise for DB lookup (strip spaces/dashes/parens)
+    const normalised = raw.replace(/[\s\-().]/g, "");
+
+    const db = getDb();
+    const user =
+      db.prepare("SELECT * FROM users WHERE replace(replace(replace(replace(phone,' ',''),'-',''),'(',''),')','') = ?").get(normalised) ||
+      db.prepare("SELECT * FROM users WHERE phone = ?").get(raw);
+
+    if (!user) return res.status(404).json({ success: false, error: "No account found with this phone number." });
+
+    const otp     = String(Math.floor(100000 + Math.random() * 900000));
+    const expires = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+
+    db.prepare(
+      "UPDATE users SET phone_otp = ?, phone_otp_expires = ?, updated_at = ? WHERE id = ?"
+    ).run(otp, expires, new Date().toISOString(), user.id);
+
+    // Send the SMS — phone stored in DB may lack + prefix; ensure E.164
+    const toNumber = user.phone.startsWith("+") ? user.phone : `+${user.phone}`;
+    await sendOtpSms(toNumber, otp);
+
+    return res.status(200).json({ success: true, message: "OTP sent to your phone." });
+  } catch (err) {
+    console.error("[users] POST /send-phone-otp error:", err);
+    return res.status(500).json({ success: false, error: "Failed to send SMS OTP.", message: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/users/verify-phone
+// Accepts { phone, otp }. Validates the OTP and marks the phone as verified.
+//
+// Body: { phone, otp }
+// ---------------------------------------------------------------------------
+router.post("/verify-phone", (req, res) => {
+  try {
+    const { phone, otp } = req.body;
+    if (!phone || !otp) return res.status(400).json({ success: false, error: "phone and otp are required" });
+
+    const normalised = phone.toString().trim().replace(/[\s\-().]/g, "");
+    const db = getDb();
+    const user =
+      db.prepare("SELECT * FROM users WHERE replace(replace(replace(replace(phone,' ',''),'-',''),'(',''),')','') = ?").get(normalised) ||
+      db.prepare("SELECT * FROM users WHERE phone = ?").get(phone.toString().trim());
+
+    if (!user)                              return res.status(404).json({ success: false, error: "No account found with this phone number." });
+    if (user.is_phone_verified === 1)       return res.status(200).json({ success: true,  message: "Phone already verified." });
+    if (!user.phone_otp)                    return res.status(400).json({ success: false, error: "No OTP requested. Please click Send OTP first." });
+    if (user.phone_otp !== String(otp))     return res.status(400).json({ success: false, error: "Incorrect OTP. Please try again." });
+    if (new Date(user.phone_otp_expires) < new Date()) return res.status(400).json({ success: false, error: "OTP has expired. Please request a new one." });
+
+    db.prepare(
+      "UPDATE users SET is_phone_verified = 1, phone_otp = NULL, phone_otp_expires = NULL, updated_at = ? WHERE id = ?"
+    ).run(new Date().toISOString(), user.id);
+
+    return res.status(200).json({ success: true, message: "Phone number verified successfully!" });
+  } catch (err) {
+    console.error("[users] POST /verify-phone error:", err);
+    return res.status(500).json({ success: false, error: "Phone verification failed.", message: err.message });
   }
 });
 
