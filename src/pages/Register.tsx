@@ -98,12 +98,17 @@ export default function Register() {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isGoogleSubmitting, setIsGoogleSubmitting] = useState<boolean>(false);
 
-  // Phone OTP verification step
-  const [step, setStep] = useState<"form" | "phone-otp">("form");
+  // Phone OTP / email-verify step flow
+  const [step, setStep] = useState<"form" | "phone-otp" | "email-verify">("form");
   const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
   const [phoneOtp, setPhoneOtp] = useState<string>("");
   const [verifyingPhone, setVerifyingPhone] = useState<boolean>(false);
   const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
+
+  // Resend activation email (from the email-verify step)
+  const [resendEmailSending, setResendEmailSending] = useState(false);
+  const [resendEmailSent,    setResendEmailSent]    = useState(false);
+  const [resendEmailError,   setResendEmailError]   = useState<string | null>(null);
 
   // -------------------------------------------------------------------------
   // Client-side validation
@@ -188,19 +193,8 @@ export default function Register() {
       // setup dialog shows exactly once on the first dashboard visit.
       localStorage.setItem("showCurrencySetup", "true");
 
-      // Navigate to dashboard on successful registration
-      navigate("/dashboard", { replace: true });
-
-      // If no phone was entered, prompt the user to add it in Settings
-      if (!phoneNumber.trim()) {
-        setTimeout(() => {
-          toast({
-            title: "Add your phone number",
-            description: "You can add a phone number in Settings so you can sign in with it later.",
-            duration: 8000,
-          });
-        }, 800);
-      }
+      // Show the email verification prompt before entering the app
+      setStep("email-verify");
     } catch (err) {
       setErrorMessage(parseFirebaseError(err));
     } finally {
@@ -227,7 +221,7 @@ export default function Register() {
       }
 
       localStorage.setItem("showCurrencySetup", "true");
-      navigate("/dashboard", { replace: true });
+      setStep("email-verify");
     } catch (err) {
       setErrorMessage("Invalid code. Please check and try again.");
     } finally {
@@ -235,10 +229,27 @@ export default function Register() {
     }
   }
 
-  // Skip phone verification and go straight to dashboard
+  // Skip phone verification — still show the email verification prompt
   function handleSkipPhoneVerification(): void {
     localStorage.setItem("showCurrencySetup", "true");
-    navigate("/dashboard", { replace: true });
+    setStep("email-verify");
+  }
+
+  // Resend activation email from the email-verify step
+  async function handleResendEmailFromStep(): Promise<void> {
+    if (!email.trim()) return;
+    setResendEmailSending(true);
+    setResendEmailError(null);
+    setResendEmailSent(false);
+    try {
+      await api.post("/users/send-activation-email", { email: email.trim() });
+      setResendEmailSent(true);
+      setTimeout(() => setResendEmailSent(false), 8000);
+    } catch (e: any) {
+      setResendEmailError(e.response?.data?.error ?? "Failed to resend. Please try again.");
+    } finally {
+      setResendEmailSending(false);
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -280,6 +291,75 @@ export default function Register() {
       <div id="recaptcha-container" />
 
       <div className="w-full max-w-md rounded-2xl p-8" style={{ background: "rgba(255,255,255,0.85)", border: "1px solid rgba(255,255,255,0.95)", boxShadow: "0 4px 16px rgba(124,58,237,0.10), 0 12px 48px rgba(124,58,237,0.08), inset 0 1px 0 rgba(255,255,255,1)", backdropFilter: "blur(20px)" }}>
+
+        {/* ================================================================ */}
+        {/* Email verification prompt (after registration / phone OTP)       */}
+        {/* ================================================================ */}
+        {step === "email-verify" && (
+          <>
+            <div className="mb-8 text-center">
+              <div
+                className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full"
+                style={{
+                  background: "linear-gradient(135deg, #f59e0b, #d97706)",
+                  boxShadow: "0 4px 20px rgba(245,158,11,0.40), inset 0 1px 0 rgba(255,255,255,0.25)",
+                }}
+              >
+                {/* Envelope icon */}
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <h1 className="text-2xl font-bold tracking-tight text-foreground">Verify your email</h1>
+              <p className="mt-1 text-sm text-muted-foreground">
+                We sent an activation link to
+              </p>
+              <p className="mt-0.5 text-sm font-semibold text-foreground">{email.trim()}</p>
+            </div>
+
+            {/* Info box */}
+            <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50/70 dark:bg-amber-900/10 dark:border-amber-800/40 px-4 py-4 space-y-1.5">
+              <p className="text-sm text-foreground font-medium">What to do next:</p>
+              <ol className="list-decimal list-inside space-y-1 text-sm text-muted-foreground">
+                <li>Open the email in your inbox</li>
+                <li>Click the <strong className="text-foreground">Activate account</strong> button</li>
+                <li>Come back and sign in</li>
+              </ol>
+              <p className="text-xs text-muted-foreground pt-1">The link expires in <strong>24 hours</strong>. Check your spam folder if you don't see it.</p>
+            </div>
+
+            {/* Resend button */}
+            <button
+              type="button"
+              onClick={handleResendEmailFromStep}
+              disabled={resendEmailSending || resendEmailSent}
+              className={`w-full rounded-lg px-4 py-2.5 text-sm font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-60 ${
+                resendEmailSent
+                  ? "bg-green-600 text-white"
+                  : "bg-amber-500 hover:bg-amber-600 text-white"
+              }`}
+            >
+              {resendEmailSending
+                ? "Sending…"
+                : resendEmailSent
+                ? "✓ Email resent! Check your inbox"
+                : "Resend activation email"}
+            </button>
+
+            {resendEmailError && (
+              <p className="mt-2 text-xs text-destructive text-center">{resendEmailError}</p>
+            )}
+
+            {/* Continue anyway */}
+            <button
+              type="button"
+              onClick={() => navigate("/dashboard", { replace: true })}
+              className="mt-4 w-full text-center text-sm text-muted-foreground underline-offset-4 hover:underline"
+            >
+              Continue to dashboard →
+            </button>
+          </>
+        )}
 
         {/* ================================================================ */}
         {/* Phone OTP verification step                                       */}
@@ -345,7 +425,7 @@ export default function Register() {
               onClick={handleSkipPhoneVerification}
               className="mt-4 w-full text-center text-sm text-muted-foreground underline-offset-4 hover:underline"
             >
-              Skip for now
+              Skip phone verification
             </button>
           </>
         )}
