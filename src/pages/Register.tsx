@@ -23,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { CheckCircle2 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
 // Phone number placeholders by country code
@@ -98,23 +99,101 @@ export default function Register() {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isGoogleSubmitting, setIsGoogleSubmitting] = useState<boolean>(false);
 
+  // ── Email OTP ──────────────────────────────────────────────────────────
+  const [emailOtpSent,     setEmailOtpSent]     = useState(false);
+  const [emailOtpValue,    setEmailOtpValue]    = useState("");
+  const [emailVerified,    setEmailVerified]    = useState(false);
+  const [emailOtpError,    setEmailOtpError]    = useState<string | null>(null);
+  const [sendingEmailOtp,  setSendingEmailOtp]  = useState(false);
+  const [verifyingEmail,   setVerifyingEmail]   = useState(false);
+
+  // ── Phone OTP ──────────────────────────────────────────────────────────
+  const [phoneOtpSent,     setPhoneOtpSent]     = useState(false);
+  const [phoneOtpValue,    setPhoneOtpValue]    = useState("");
+  const [phoneVerified,    setPhoneVerified]    = useState(false);
+  const [phoneOtpError,    setPhoneOtpError]    = useState<string | null>(null);
+  const [sendingPhoneOtp,  setSendingPhoneOtp]  = useState(false);
+  const [verifyingPhone,   setVerifyingPhone]   = useState(false);
+
   // -------------------------------------------------------------------------
   // Client-side validation
   // -------------------------------------------------------------------------
   function validateForm(): string | null {
     if (!name.trim()) return "Full name is required.";
     if (name.trim().length < 2) return "Name must be at least 2 characters.";
-    // Phone is optional — but if entered it must meet the length requirement
     if (phoneNumber.trim()) {
       const maxLen = phoneMaxLengths[countryCode] ?? 15;
       const digits = phoneNumber.replace(/\D/g, "");
       if (digits.length !== maxLen) return `Phone number must be exactly ${maxLen} digits for ${countryCode}.`;
+      if (!phoneVerified) return "Please verify your phone number before continuing.";
     }
     if (!email.trim()) return "Email address is required.";
+    if (!emailVerified)  return "Please verify your email address before continuing.";
     if (!password) return "Password is required.";
     if (!strongPasswordRegex.test(password)) return "Password does not meet security requirements.";
     if (password !== confirmPassword) return "Passwords do not match.";
     return null;
+  }
+
+  // -------------------------------------------------------------------------
+  // OTP — send email code
+  // -------------------------------------------------------------------------
+  async function sendEmailOtp() {
+    if (!email.trim()) { setEmailOtpError("Enter your email address first."); return; }
+    setSendingEmailOtp(true); setEmailOtpError(null);
+    try {
+      const { data } = await api.post("/users/send-otp", { type: "email", target: email.trim() });
+      setEmailOtpSent(true);
+      if (data.devCode) {
+        toast({ title: "Dev mode — no SMTP configured", description: `Email OTP: ${data.devCode}`, duration: 30000 });
+      }
+    } catch (e: any) {
+      setEmailOtpError(e.response?.data?.error ?? "Failed to send code. Try again.");
+    } finally { setSendingEmailOtp(false); }
+  }
+
+  async function verifyEmailOtp() {
+    if (!emailOtpValue.trim()) { setEmailOtpError("Enter the 6-digit code."); return; }
+    setVerifyingEmail(true); setEmailOtpError(null);
+    try {
+      await api.post("/users/verify-otp", { type: "email", target: email.trim(), code: emailOtpValue.trim() });
+      setEmailVerified(true);
+    } catch (e: any) {
+      setEmailOtpError(e.response?.data?.error ?? "Verification failed.");
+    } finally { setVerifyingEmail(false); }
+  }
+
+  // -------------------------------------------------------------------------
+  // OTP — send phone code (delivered to user's email inbox)
+  // -------------------------------------------------------------------------
+  async function sendPhoneOtp() {
+    const digits = phoneNumber.replace(/\D/g, "");
+    const maxLen = phoneMaxLengths[countryCode] ?? 15;
+    if (digits.length !== maxLen) { setPhoneOtpError(`Enter all ${maxLen} digits first.`); return; }
+    if (!email.trim()) { setPhoneOtpError("Fill in your email address first — the code will be delivered there."); return; }
+    setSendingPhoneOtp(true); setPhoneOtpError(null);
+    try {
+      const fullPhone = `${countryCode}${phoneNumber.trim()}`;
+      const { data } = await api.post("/users/send-otp", { type: "phone", target: fullPhone, deliverTo: email.trim() });
+      setPhoneOtpSent(true);
+      if (data.devCode) {
+        toast({ title: "Dev mode — no SMTP configured", description: `Phone OTP: ${data.devCode}`, duration: 30000 });
+      }
+    } catch (e: any) {
+      setPhoneOtpError(e.response?.data?.error ?? "Failed to send code. Try again.");
+    } finally { setSendingPhoneOtp(false); }
+  }
+
+  async function verifyPhoneOtp() {
+    if (!phoneOtpValue.trim()) { setPhoneOtpError("Enter the 6-digit code."); return; }
+    setVerifyingPhone(true); setPhoneOtpError(null);
+    try {
+      const fullPhone = `${countryCode}${phoneNumber.trim()}`;
+      await api.post("/users/verify-otp", { type: "phone", target: fullPhone, code: phoneOtpValue.trim() });
+      setPhoneVerified(true);
+    } catch (e: any) {
+      setPhoneOtpError(e.response?.data?.error ?? "Verification failed.");
+    } finally { setVerifyingPhone(false); }
   }
 
   // -------------------------------------------------------------------------
@@ -324,6 +403,7 @@ export default function Register() {
                   const digits = e.target.value.replace(/\D/g, "");
                   const maxLen = phoneMaxLengths[countryCode] ?? 15;
                   setPhoneNumber(digits.slice(0, maxLen));
+                  setPhoneVerified(false); setPhoneOtpSent(false); setPhoneOtpValue(""); setPhoneOtpError(null);
                 }}
                 className="flex-1 rounded-lg border border-input bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50"
                 placeholder={phonePlaceholders[countryCode] || "Enter phone number"}
@@ -334,27 +414,106 @@ export default function Register() {
             <p className="text-xs text-muted-foreground">
               Digits only · {phoneMaxLengths[countryCode] ?? 15} digits required for {countryCode} · Optional
             </p>
+
+            {/* Phone OTP section */}
+            {phoneNumber.trim().length > 0 && !phoneVerified && (
+              <div className="space-y-2 rounded-lg border border-input bg-muted/30 p-3">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    placeholder="Enter 6-digit code"
+                    value={phoneOtpValue}
+                    onChange={(e) => setPhoneOtpValue(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    disabled={!phoneOtpSent || verifyingPhone || isSubmitting}
+                    className="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 disabled:opacity-50"
+                  />
+                  {!phoneOtpSent ? (
+                    <button type="button" onClick={sendPhoneOtp} disabled={sendingPhoneOtp || isSubmitting}
+                      className="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50 whitespace-nowrap">
+                      {sendingPhoneOtp ? "Sending…" : "Send OTP"}
+                    </button>
+                  ) : (
+                    <>
+                      <button type="button" onClick={verifyPhoneOtp} disabled={verifyingPhone || !phoneOtpValue || isSubmitting}
+                        className="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50">
+                        {verifyingPhone ? "Verifying…" : "Verify"}
+                      </button>
+                      <button type="button" onClick={sendPhoneOtp} disabled={sendingPhoneOtp || isSubmitting}
+                        className="rounded-lg border border-input px-3 py-2 text-xs text-muted-foreground hover:bg-muted disabled:opacity-50">
+                        Resend
+                      </button>
+                    </>
+                  )}
+                </div>
+                {phoneOtpSent && !phoneOtpError && (
+                  <p className="text-xs text-muted-foreground">Code sent to your email inbox — valid for 10 min.</p>
+                )}
+                {phoneOtpError && <p className="text-xs text-destructive">{phoneOtpError}</p>}
+              </div>
+            )}
+            {phoneVerified && (
+              <p className="flex items-center gap-1 text-xs text-emerald-600 font-medium">
+                <CheckCircle2 className="h-3.5 w-3.5" /> Phone number verified
+              </p>
+            )}
           </div>
 
           {/* Email */}
           <div className="space-y-1.5">
-            <label
-              htmlFor="register-email"
-              className="block text-sm font-medium text-foreground"
-            >
+            <label htmlFor="register-email" className="block text-sm font-medium text-foreground">
               Email address
             </label>
-            <input
-              id="register-email"
-              type="email"
-              autoComplete="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50"
-              placeholder="you@example.com"
-              disabled={isSubmitting || isGoogleSubmitting}
-            />
+            <div className="flex gap-2">
+              <input
+                id="register-email"
+                type="email"
+                autoComplete="email"
+                required
+                value={email}
+                onChange={(e) => { setEmail(e.target.value); setEmailVerified(false); setEmailOtpSent(false); setEmailOtpValue(""); setEmailOtpError(null); }}
+                className="flex-1 rounded-lg border border-input bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50"
+                placeholder="you@example.com"
+                disabled={isSubmitting || isGoogleSubmitting || emailVerified}
+              />
+              {!emailVerified && (
+                <button type="button" onClick={sendEmailOtp} disabled={sendingEmailOtp || isSubmitting || !email.trim()}
+                  className="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50 whitespace-nowrap">
+                  {sendingEmailOtp ? "Sending…" : emailOtpSent ? "Resend" : "Send Code"}
+                </button>
+              )}
+              {emailVerified && (
+                <span className="flex items-center gap-1 text-xs text-emerald-600 font-semibold px-2">
+                  <CheckCircle2 className="h-4 w-4" /> Verified
+                </span>
+              )}
+            </div>
+
+            {/* Email OTP input */}
+            {emailOtpSent && !emailVerified && (
+              <div className="space-y-2 rounded-lg border border-input bg-muted/30 p-3">
+                <p className="text-xs text-muted-foreground">Enter the 6-digit code sent to your email — valid for 10 min.</p>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    placeholder="000000"
+                    value={emailOtpValue}
+                    onChange={(e) => setEmailOtpValue(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    disabled={verifyingEmail || isSubmitting}
+                    className="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm tracking-widest focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 disabled:opacity-50"
+                  />
+                  <button type="button" onClick={verifyEmailOtp} disabled={verifyingEmail || !emailOtpValue || isSubmitting}
+                    className="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50">
+                    {verifyingEmail ? "Verifying…" : "Verify"}
+                  </button>
+                </div>
+                {emailOtpError && <p className="text-xs text-destructive">{emailOtpError}</p>}
+              </div>
+            )}
+            {!emailOtpSent && emailOtpError && <p className="text-xs text-destructive">{emailOtpError}</p>}
           </div>
 
           {/* Password */}

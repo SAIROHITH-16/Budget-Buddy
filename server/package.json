@@ -17,6 +17,7 @@
     "firebase-admin": "^12.3.0",
     "mongoose": "^8.5.1",
     "multer": "^2.0.2",
+    "nodemailer": "^6.9.0",
     "pdf-parse": "^2.4.5"
   },
   "devDependencies": {
