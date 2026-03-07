@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, type FormEvent } from "react";
 import { updateProfile, sendPasswordResetEmail } from "firebase/auth";
-import { User, Mail, KeyRound, Loader2, Save, CheckCircle2, AlertCircle, Phone } from "lucide-react";
-import { auth } from "@/firebase";
+import { User, Mail, KeyRound, Loader2, Save, CheckCircle2, AlertCircle, Phone, ShieldCheck, ShieldAlert, RefreshCw } from "lucide-react";
+import { auth, RecaptchaVerifier, linkWithPhoneNumber, type ConfirmationResult } from "@/firebase";
 import { useAuth } from "@/context/AuthContext";
 import api from "@/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -44,12 +45,31 @@ export function ProfileSettings() {
   const [resetSent,    setResetSent]    = useState(false);
   const [resetError,   setResetError]   = useState<string | null>(null);
 
-  // ── Phone number (fetched from backend profile) ──────────────────────────
-  const [phone, setPhone] = useState<string | null>(null);
+  // ── Phone number + verification state (fetched from backend profile) ──────
+  const [phone,           setPhone]           = useState<string | null>(null);
+  const [isEmailVerified, setIsEmailVerified] = useState<boolean | null>(null);
+  const [isPhoneVerified, setIsPhoneVerified] = useState<boolean | null>(null);
+
+  // ── Resend activation email state ────────────────────────────────────────
+  const [resendSending, setResendSending] = useState(false);
+  const [resendSent,    setResendSent]    = useState(false);
+  const [resendError,   setResendError]   = useState<string | null>(null);
+
+  // ── Phone OTP state ───────────────────────────────────────────────────────
+  const [phoneOtpStep,       setPhoneOtpStep]       = useState<"idle" | "sending" | "otp" | "verifying">("idle");
+  const [phoneOtpCode,       setPhoneOtpCode]       = useState("");
+  const [phoneOtpError,      setPhoneOtpError]      = useState<string | null>(null);
+  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
+  const recaptchaRef = useRef<RecaptchaVerifier | null>(null);
 
   useEffect(() => {
     api.get("/users/profile")
-      .then((res) => setPhone(res.data?.data?.phone ?? null))
+      .then((res) => {
+        const data = res.data?.data;
+        setPhone(data?.phone ?? null);
+        setIsEmailVerified(data?.isVerified ?? false);
+        setIsPhoneVerified(data?.isPhoneVerified ?? false);
+      })
       .catch(() => setPhone(null));
   }, [currentUser?.uid]);
 
@@ -80,6 +100,70 @@ export function ProfileSettings() {
       setNameError(e.message ?? "Failed to update display name.");
     } finally {
       setNameSaving(false);
+    }
+  };
+
+  // ── Resend activation email ──────────────────────────────────────────────
+  const handleResendActivationEmail = async () => {
+    if (!email) return;
+    setResendSending(true);
+    setResendError(null);
+    setResendSent(false);
+    try {
+      await api.post("/users/send-activation-email", { email });
+      setResendSent(true);
+      setTimeout(() => setResendSent(false), 8000);
+    } catch (e: any) {
+      setResendError(e.response?.data?.error ?? "Failed to send activation email.");
+    } finally {
+      setResendSending(false);
+    }
+  };
+
+  // ── Send phone OTP via Firebase ──────────────────────────────────────────
+  const handleSendPhoneOtp = async () => {
+    if (!phone || !auth.currentUser) return;
+    setPhoneOtpStep("sending");
+    setPhoneOtpError(null);
+    try {
+      if (recaptchaRef.current) { recaptchaRef.current.clear(); recaptchaRef.current = null; }
+      const verifier = new RecaptchaVerifier(auth, "settings-recaptcha-container", { size: "invisible" });
+      recaptchaRef.current = verifier;
+      const result = await linkWithPhoneNumber(auth.currentUser, phone, verifier);
+      setConfirmationResult(result);
+      setPhoneOtpStep("otp");
+    } catch (err: any) {
+      // Phone may already be linked to this Firebase account — just mark verified
+      if (err.code === "auth/provider-already-linked" || err.code === "auth/credential-already-in-use") {
+        try {
+          await api.post("/users/mark-phone-verified");
+          setIsPhoneVerified(true);
+        } catch {
+          setPhoneOtpError("Failed to record phone verification. Please try again.");
+        }
+      } else {
+        setPhoneOtpError(err.message ?? "Failed to send OTP.");
+      }
+      setPhoneOtpStep("idle");
+      if (recaptchaRef.current) { recaptchaRef.current.clear(); recaptchaRef.current = null; }
+    }
+  };
+
+  // ── Confirm phone OTP ────────────────────────────────────────────────────
+  const handleConfirmPhoneOtp = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!confirmationResult) return;
+    setPhoneOtpStep("verifying");
+    setPhoneOtpError(null);
+    try {
+      await confirmationResult.confirm(phoneOtpCode.trim());
+      await api.post("/users/mark-phone-verified");
+      setIsPhoneVerified(true);
+      setPhoneOtpStep("idle");
+      setPhoneOtpCode("");
+    } catch {
+      setPhoneOtpError("Invalid code. Please check and try again.");
+      setPhoneOtpStep("otp");
     }
   };
 
@@ -181,11 +265,16 @@ export function ProfileSettings() {
           )}
         </div>
 
-        {/* ── Email (read-only) ─────────────────────────────────────────── */}
+        {/* ── Email (read-only) + verification status ───────────────────── */}
         <div className="space-y-2">
           <Label htmlFor="email" className="flex items-center gap-1.5">
             <Mail className="h-3.5 w-3.5" />
             Email
+            {isPasswordProvider && isEmailVerified !== null && (
+              isEmailVerified
+                ? <Badge variant="secondary" className="ml-1 gap-1 text-green-700 bg-green-100 border-green-200"><ShieldCheck className="h-3 w-3" />Verified</Badge>
+                : <Badge variant="secondary" className="ml-1 gap-1 text-amber-700 bg-amber-100 border-amber-200"><ShieldAlert className="h-3 w-3" />Unverified</Badge>
+            )}
           </Label>
           <Input
             id="email"
@@ -195,16 +284,51 @@ export function ProfileSettings() {
             disabled
             className="opacity-70 cursor-not-allowed"
           />
-          <p className="text-xs text-muted-foreground">
-            Email address cannot be changed here.
-          </p>
+          {/* Resend activation link — only for email/password + unverified */}
+          {isPasswordProvider && isEmailVerified === false && (
+            <div className="space-y-1">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleResendActivationEmail}
+                disabled={resendSending || resendSent}
+                className="gap-1.5"
+              >
+                {resendSending
+                  ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Sending…</>
+                  : resendSent
+                  ? <><CheckCircle2 className="h-3.5 w-3.5 text-green-600" />Email sent!</>
+                  : <><RefreshCw className="h-3.5 w-3.5" />Resend activation email</>}
+              </Button>
+              {resendSent && <p className="text-xs text-muted-foreground">Check your inbox — the link expires in 24 hours.</p>}
+              {resendError && <p className="flex items-center gap-1.5 text-xs expense-text"><AlertCircle className="h-3.5 w-3.5 shrink-0" />{resendError}</p>}
+            </div>
+          )}
+          {(!isPasswordProvider) && (
+            <p className="text-xs text-muted-foreground">
+              Email address cannot be changed here.
+            </p>
+          )}
+          {isPasswordProvider && isEmailVerified && (
+            <p className="text-xs text-muted-foreground">
+              Email address cannot be changed here.
+            </p>
+          )}
         </div>
 
-        {/* ── Phone number (read-only) ──────────────────────────────────── */}
+        {/* ── Phone number + verification ───────────────────────────────── */}
         <div className="space-y-2">
+          {/* Hidden reCAPTCHA mount point for phone OTP */}
+          <div id="settings-recaptcha-container" />
+
           <Label htmlFor="phone" className="flex items-center gap-1.5">
             <Phone className="h-3.5 w-3.5" />
             Phone Number
+            {isPhoneVerified !== null && phone && (
+              isPhoneVerified
+                ? <Badge variant="secondary" className="ml-1 gap-1 text-green-700 bg-green-100 border-green-200"><ShieldCheck className="h-3 w-3" />Verified</Badge>
+                : <Badge variant="secondary" className="ml-1 gap-1 text-amber-700 bg-amber-100 border-amber-200"><ShieldAlert className="h-3 w-3" />Unverified</Badge>
+            )}
           </Label>
           <Input
             id="phone"
@@ -215,9 +339,87 @@ export function ProfileSettings() {
             placeholder={phone === null ? "Not set" : undefined}
             className="opacity-70 cursor-not-allowed"
           />
-          <p className="text-xs text-muted-foreground">
-            Phone number saved during registration.
-          </p>
+
+          {/* Verify phone button — shown when phone is saved but not verified */}
+          {phone && isPhoneVerified === false && phoneOtpStep === "idle" && (
+            <div className="space-y-1">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleSendPhoneOtp}
+                className="gap-1.5"
+              >
+                <ShieldCheck className="h-3.5 w-3.5" />
+                Verify phone number
+              </Button>
+              {phoneOtpError && (
+                <p className="flex items-center gap-1.5 text-xs expense-text">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />{phoneOtpError}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Sending OTP spinner */}
+          {phoneOtpStep === "sending" && (
+            <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />Sending verification code…
+            </p>
+          )}
+
+          {/* OTP input form */}
+          {phoneOtpStep === "otp" && (
+            <form onSubmit={handleConfirmPhoneOtp} className="space-y-2">
+              <p className="text-xs text-muted-foreground">
+                Enter the 6-digit code sent to <span className="font-medium text-foreground">{phone}</span>
+              </p>
+              <div className="flex gap-2">
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  value={phoneOtpCode}
+                  onChange={(e) => setPhoneOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                  placeholder="------"
+                  className="tracking-[0.4em] text-center font-mono"
+                  disabled={phoneOtpStep === "verifying" as any}
+                />
+                <Button
+                  type="submit"
+                  disabled={phoneOtpCode.length !== 6}
+                  size="sm"
+                  className="shrink-0"
+                >
+                  Verify
+                </Button>
+              </div>
+              {phoneOtpError && (
+                <p className="flex items-center gap-1.5 text-xs expense-text">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />{phoneOtpError}
+                </p>
+              )}
+            </form>
+          )}
+
+          {/* Verifying spinner */}
+          {phoneOtpStep === "verifying" && (
+            <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />Verifying code…
+            </p>
+          )}
+
+          {/* Success */}
+          {isPhoneVerified && (
+            <p className="text-xs text-muted-foreground">
+              Phone number verified.
+            </p>
+          )}
+          {!phone && (
+            <p className="text-xs text-muted-foreground">
+              No phone number saved. You can add one by re-registering or updating your profile.
+            </p>
+          )}
         </div>
 
         {/* ── Password reset (only for email/password accounts) ─────────── */}
