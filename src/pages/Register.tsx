@@ -227,6 +227,7 @@ export default function Register() {
               boxShadow: "0 4px 20px rgba(37,99,235,0.40), inset 0 1px 0 rgba(255,255,255,0.25)",
             }}
           >
+            {/* Add user / signup icon */}
             <svg
               xmlns="http://www.w3.org/2000/svg"
               className="h-7 w-7 text-white"
@@ -235,16 +236,8 @@ export default function Register() {
               stroke="currentColor"
               strokeWidth={1.8}
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M3 7a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"
-              />
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M16 11a1 1 0 110 2 1 1 0 010-2z"
-              />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h11" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 11v6m-3-3h6" />
             </svg>
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">

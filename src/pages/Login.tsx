@@ -169,25 +169,14 @@ export default function Login() {
               boxShadow: "0 4px 20px rgba(37,99,235,0.40), inset 0 1px 0 rgba(255,255,255,0.25)",
             }}
           >
-            {/* Wallet icon – inline SVG, no icon library dependency */}
+            {/* Login / person icon */}
             <svg
               xmlns="http://www.w3.org/2000/svg"
               className="h-7 w-7 text-white"
-              fill="none"
+              fill="currentColor"
               viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={1.8}
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M3 7a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"
-              />
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M16 11a1 1 0 110 2 1 1 0 010-2z"
-              />
+              <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/>
             </svg>
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">

@@ -93,20 +93,19 @@ export default function ForgotPassword() {
               boxShadow: "0 4px 20px rgba(37,99,235,0.40), inset 0 1px 0 hsl(0 0% 100% / 0.25)",
             }}
           >
-            {/* Key icon */}
+            {/* Lock + question mark icon */}
             <svg
               xmlns="http://www.w3.org/2000/svg"
               className="h-7 w-7 text-white"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
-              strokeWidth={2}
+              strokeWidth={1.8}
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
-              />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v.01M12 11.5c0-1 .7-1.8 1.5-2.3a3 3 0 10-4.5-2.6" />
+              <rect x="3" y="11" width="14" height="10" rx="2" strokeLinecap="round" strokeLinejoin="round" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M7 11V7a5 5 0 0110 0v4" />
+              <text x="17" y="22" fontSize="7" fontWeight="bold" fill="white" stroke="none">?</text>
             </svg>
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">
