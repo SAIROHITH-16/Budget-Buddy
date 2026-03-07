@@ -286,18 +286,21 @@ export function ProfileSettings() {
           />
           {/* Resend activation link — only for email/password + unverified */}
           {isPasswordProvider && isEmailVerified === false && (
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <Button
-                variant="outline"
                 size="sm"
                 onClick={handleResendActivationEmail}
                 disabled={resendSending || resendSent}
-                className="gap-1.5"
+                className={`gap-2 font-semibold transition-all ${
+                  resendSent
+                    ? "bg-green-600 hover:bg-green-600 text-white border-green-600"
+                    : "bg-amber-500 hover:bg-amber-600 text-white border-transparent"
+                }`}
               >
                 {resendSending
                   ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Sending…</>
                   : resendSent
-                  ? <><CheckCircle2 className="h-3.5 w-3.5 text-green-600" />Email sent!</>
+                  ? <><CheckCircle2 className="h-3.5 w-3.5" />Email sent!</>
                   : <><RefreshCw className="h-3.5 w-3.5" />Resend activation email</>}
               </Button>
               {resendSent && <p className="text-xs text-muted-foreground">Check your inbox — the link expires in 24 hours.</p>}
@@ -342,12 +345,11 @@ export function ProfileSettings() {
 
           {/* Verify phone button — shown when phone is saved but not verified */}
           {phone && isPhoneVerified === false && phoneOtpStep === "idle" && (
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <Button
-                variant="outline"
                 size="sm"
                 onClick={handleSendPhoneOtp}
-                className="gap-1.5"
+                className="gap-2 font-semibold bg-amber-500 hover:bg-amber-600 text-white border-transparent transition-all"
               >
                 <ShieldCheck className="h-3.5 w-3.5" />
                 Verify phone number
@@ -369,9 +371,10 @@ export function ProfileSettings() {
 
           {/* OTP input form */}
           {phoneOtpStep === "otp" && (
-            <form onSubmit={handleConfirmPhoneOtp} className="space-y-2">
-              <p className="text-xs text-muted-foreground">
-                Enter the 6-digit code sent to <span className="font-medium text-foreground">{phone}</span>
+            <form onSubmit={handleConfirmPhoneOtp} className="space-y-3 rounded-xl border border-amber-200 bg-amber-50/60 dark:bg-amber-900/10 dark:border-amber-800/40 p-4">
+              <p className="text-sm font-medium text-foreground">
+                Enter the 6-digit code sent to{" "}
+                <span className="font-bold">{phone}</span>
               </p>
               <div className="flex gap-2">
                 <Input
@@ -381,16 +384,15 @@ export function ProfileSettings() {
                   maxLength={6}
                   value={phoneOtpCode}
                   onChange={(e) => setPhoneOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                  placeholder="------"
-                  className="tracking-[0.4em] text-center font-mono"
-                  disabled={phoneOtpStep === "verifying" as any}
+                  placeholder="— — — — — —"
+                  className="tracking-[0.5em] text-center font-mono text-lg h-11 border-amber-300 focus-visible:ring-amber-400"
                 />
                 <Button
                   type="submit"
                   disabled={phoneOtpCode.length !== 6}
-                  size="sm"
-                  className="shrink-0"
+                  className="shrink-0 h-11 px-5 font-semibold gap-2"
                 >
+                  <ShieldCheck className="h-4 w-4" />
                   Verify
                 </Button>
               </div>
@@ -442,14 +444,18 @@ export function ProfileSettings() {
                 variant="outline"
                 onClick={handleResetPassword}
                 disabled={resetSending || resetSent}
-                className="w-full sm:w-auto"
+                className={`w-full sm:w-auto gap-2 font-semibold transition-all ${
+                  resetSent
+                    ? "border-green-500 text-green-700 bg-green-50 hover:bg-green-50 dark:bg-green-900/20"
+                    : "hover:border-primary hover:text-primary"
+                }`}
               >
                 {resetSending ? (
-                  <><Loader2 className="h-4 w-4 animate-spin mr-2" />Sending…</>
+                  <><Loader2 className="h-4 w-4 animate-spin" />Sending…</>
                 ) : resetSent ? (
-                  <><CheckCircle2 className="h-4 w-4 mr-2 income-text" />Email sent!</>
+                  <><CheckCircle2 className="h-4 w-4" />Email sent!</>
                 ) : (
-                  <>Send reset email</>
+                  <><KeyRound className="h-4 w-4" />Send reset email</>
                 )}
               </Button>
 
