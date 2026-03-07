@@ -30,6 +30,9 @@ const Dashboard = () => {
   const { transactions, loading, error } = useTransactions({ initialLimit: 10_000 });
 
   const [budget, setBudget] = useState<Budget>({ monthlyLimit: 0, alertThreshold: 80 });
+  const [budgetEnabled, setBudgetEnabled] = useState<boolean>(
+    () => localStorage.getItem("budgetEnabled") !== "false"
+  );
   const [, setCurrencyUpdate] = useState(0);
 
   // -------------------------------------------------------------------------
@@ -67,9 +70,28 @@ const Dashboard = () => {
           .then(({ data }) => setBudget(data))
           .catch(() => {});
       }
+      // Sync the enabled toggle in case it changed
+      setBudgetEnabled(localStorage.getItem("budgetEnabled") !== "false");
     };
     window.addEventListener("budgetChange", handleBudgetChange);
-    return () => window.removeEventListener("budgetChange", handleBudgetChange);
+    // Also sync whenever localStorage changes from another tab
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === "budgetEnabled") {
+        setBudgetEnabled(e.newValue !== "false");
+      }
+    };
+    // Sync immediately when BudgetSettings toggle is flipped in the same tab
+    const handleEnabledChange = (e: Event) => {
+      const { enabled } = (e as CustomEvent<{ enabled: boolean }>).detail;
+      setBudgetEnabled(enabled);
+    };
+    window.addEventListener("storage", handleStorage);
+    window.addEventListener("budgetEnabledChange", handleEnabledChange);
+    return () => {
+      window.removeEventListener("budgetChange", handleBudgetChange);
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener("budgetEnabledChange", handleEnabledChange);
+    };
   }, []);
 
   // -------------------------------------------------------------------------
@@ -148,7 +170,7 @@ const Dashboard = () => {
   //   isOverLimit   → totalWithdrawals >= monthlyLimit (red)
   //   isOverAlert   → spend% >= alertThreshold but still under limit (yellow)
   // -------------------------------------------------------------------------
-  const hasLimit      = budget.monthlyLimit > 0;
+  const hasLimit      = budgetEnabled && budget.monthlyLimit > 0;
   const spentRatio    = hasLimit ? (totalWithdrawals / budget.monthlyLimit) * 100 : 0;
   const spendPercent  = Math.min(spentRatio, 100);
   const isOverLimit   = hasLimit && totalWithdrawals >= budget.monthlyLimit;

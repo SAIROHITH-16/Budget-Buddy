@@ -39,6 +39,7 @@ import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import ForgotPassword from "@/pages/ForgotPassword";
 import About from "@/pages/About";
+import VerifyEmail from "@/pages/VerifyEmail";
 
 // Private pages — only accessible when authenticated
 import Dashboard from "@/pages/Dashboard";
@@ -96,6 +97,7 @@ function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/verify-email" element={<VerifyEmail />} />
               <Route path="/about" element={<About />} />
 
               {/* ----------------------------------------------------------

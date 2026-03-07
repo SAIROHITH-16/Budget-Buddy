@@ -216,6 +216,7 @@ export function CsvImporter({ onComplete, onClose }: CsvImporterProps) {
       const { data } = await api.post<{ inserted: number; duplicates: number; total: number }>(
         "/transactions/import",
         { transactions: txRows },
+        { timeout: 100_000 }   // batch AI categorization can take up to ~60 s on cold Render instances
       );
       importResult.imported   = data.inserted;
       importResult.duplicates = data.duplicates;

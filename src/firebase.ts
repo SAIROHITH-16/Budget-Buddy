@@ -15,8 +15,12 @@ import {
   onAuthStateChanged,
   sendPasswordResetEmail,
   updateProfile,
+  RecaptchaVerifier,
+  linkWithPhoneNumber,
+  PhoneAuthProvider,
   type User,
   type UserCredential,
+  type ConfirmationResult,
 } from "firebase/auth";
 
 // ---------------------------------------------------------------------------
@@ -126,6 +130,9 @@ export {
   resetPassword,
   subscribeToAuthChanges,
   updateProfile,
+  RecaptchaVerifier,
+  linkWithPhoneNumber,
+  PhoneAuthProvider,
 };
 
-export type { User, UserCredential };
+export type { User, UserCredential, ConfirmationResult };

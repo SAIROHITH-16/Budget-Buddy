@@ -26,7 +26,8 @@ export function useInsights() {
     try {
       const response = await api.post<InsightsData & { noData?: boolean; message?: string; error?: string }>(
         "/insights/analyze",
-        { month, transactions }
+        { month, transactions },
+        { timeout: 100_000 }   // AI analysis can take up to ~60 s on cold Render instances
       );
       const data = response.data;
 

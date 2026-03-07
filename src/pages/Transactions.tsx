@@ -15,7 +15,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -274,31 +273,9 @@ const Transactions = () => {
 
             {/* List */}
             {loading && (
-              <div className="space-y-2">
-                {/* Fake date-group header */}
-                <div className="flex items-center gap-3 py-1.5">
-                  <Skeleton className="h-3 w-20" />
-                  <Skeleton className="flex-1 h-px" />
-                  <Skeleton className="h-3 w-16" />
-                </div>
-                {/* Fake transaction rows */}
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className="glass-card p-4 flex items-center gap-4">
-                    {/* Icon circle */}
-                    <Skeleton className="h-9 w-9 rounded-lg shrink-0" />
-                    {/* Description + category */}
-                    <div className="flex-1 space-y-1.5">
-                      <Skeleton className="h-3.5 w-[55%]" />
-                      <Skeleton className="h-3 w-[30%]" />
-                    </div>
-                    {/* Amount */}
-                    <Skeleton className="h-4 w-16" />
-                    {/* Action buttons */}
-                    <div className="flex gap-1">
-                      <Skeleton className="h-8 w-8 rounded-md" />
-                      <Skeleton className="h-8 w-8 rounded-md" />
-                    </div>
-                  </div>
+              <div className="space-y-3">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="glass-card p-4 h-16 animate-pulse bg-muted/30 rounded-lg" />
                 ))}
               </div>
             )}
