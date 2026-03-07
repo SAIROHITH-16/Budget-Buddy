@@ -93,28 +93,24 @@ export default function ForgotPassword() {
               boxShadow: "0 4px 20px rgba(37,99,235,0.40), inset 0 1px 0 hsl(0 0% 100% / 0.25)",
             }}
           >
-            {/* Lock with password dots + question mark */}
+            {/* Shield + password icon */}
             <svg
               xmlns="http://www.w3.org/2000/svg"
               className="h-7 w-7 text-white"
-              fill="none"
-              viewBox="0 0 28 28"
-              stroke="currentColor"
-              strokeWidth={2}
-              strokeLinecap="round"
-              strokeLinejoin="round"
+              fill="currentColor"
+              viewBox="0 0 24 24"
             >
-              {/* Shackle */}
-              <path d="M6 12V8a6 6 0 0112 0v4" />
-              {/* Lock body */}
-              <rect x="2" y="12" width="18" height="12" rx="3" />
-              {/* Three dots */}
-              <circle cx="7"  cy="18" r="1" fill="white" stroke="none" />
-              <circle cx="11" cy="18" r="1" fill="white" stroke="none" />
-              <circle cx="15" cy="18" r="1" fill="white" stroke="none" />
-              {/* Question mark */}
-              <path d="M22 13.5c0-1 .8-1.5 1.5-1.5a1.5 1.5 0 010 3c-.5 0-.5.4-.5 1" stroke="white" strokeWidth={1.8} />
-              <circle cx="23" cy="19.5" r=".8" fill="white" stroke="none" />
+              {/* Shield body */}
+              <path d="M12 2L3 6v5c0 5 3.8 9.7 9 11 5.2-1.3 9-6 9-11V6L12 2z" />
+              {/* Password dialog box — white cutout */}
+              <rect x="5.5" y="11.5" width="13" height="7" rx="1.5" fill="white" />
+              {/* Speech bubble tail */}
+              <path d="M8 11.5l-2-2.5h4l-2 2.5z" fill="white" />
+              {/* Asterisk dots */}
+              <circle cx="8"  cy="15" r="1" fill="#2563eb" />
+              <circle cx="11" cy="15" r="1" fill="#2563eb" />
+              <circle cx="14" cy="15" r="1" fill="#2563eb" />
+              <circle cx="17" cy="15" r="1" fill="#2563eb" />
             </svg>
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">
