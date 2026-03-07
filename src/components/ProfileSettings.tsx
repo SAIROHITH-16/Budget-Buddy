@@ -139,7 +139,6 @@ export function ProfileSettings() {
       setConfirmationResult(result);
       setPhoneOtpStep("otp");
     } catch (err: any) {
-      // Phone may already be linked to this Firebase account — just mark verified
       if (err.code === "auth/provider-already-linked" || err.code === "auth/credential-already-in-use") {
         try {
           await api.post("/users/mark-phone-verified");
@@ -147,6 +146,8 @@ export function ProfileSettings() {
         } catch {
           setPhoneOtpError("Failed to record phone verification. Please try again.");
         }
+      } else if (err.code === "auth/billing-not-enabled") {
+        setPhoneOtpError("Phone verification requires the Firebase Blaze plan. Upgrade at console.firebase.google.com → Spark → Blaze.");
       } else {
         setPhoneOtpError(err.message ?? "Failed to send OTP.");
       }

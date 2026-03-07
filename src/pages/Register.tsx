@@ -194,19 +194,20 @@ export default function Register() {
       // If phone was entered, verify it via Firebase SMS before proceeding
       if (phoneNumber.trim()) {
         try {
-          // Create an invisible reCAPTCHA verifier bound to the DOM placeholder
           const verifier = new RecaptchaVerifier(auth, "recaptcha-container", { size: "invisible" });
           recaptchaVerifierRef.current = verifier;
-
           const result = await linkWithPhoneNumber(user, fullPhone, verifier);
           setConfirmationResult(result);
           setStep("phone-otp");
-          // isSubmitting intentionally left true until the user finishes the OTP step
           return;
-        } catch (phoneErr) {
-          // Phone auth failed (quota, invalid number, etc.) — skip verification
-          console.warn("Phone OTP send failed, skipping verification:", phoneErr);
-          // Fall through to dashboard
+        } catch (phoneErr: any) {
+          if (phoneErr.code === "auth/billing-not-enabled") {
+            // Firebase phone SMS requires Blaze plan — skip silently
+            console.warn("Phone auth skipped: Firebase Blaze plan required for SMS.");
+          } else {
+            console.warn("Phone OTP send failed, skipping:", phoneErr);
+          }
+          // Fall through to email-verify
         }
       }
 
@@ -316,7 +317,11 @@ export default function Register() {
         navigate("/dashboard", { replace: true });
         return;
       }
-      setSetupOtpError(err.message ?? "Failed to send verification code.");
+      if (err.code === "auth/billing-not-enabled") {
+        setSetupOtpError("Phone verification requires Firebase Blaze plan. Please upgrade your Firebase project at console.firebase.google.com, or skip for now.");
+      } else {
+        setSetupOtpError(err.message ?? "Failed to send verification code.");
+      }
       if (setupRecaptchaRef.current) { setupRecaptchaRef.current.clear(); setupRecaptchaRef.current = null; }
     } finally {
       setSetupSending(false);
