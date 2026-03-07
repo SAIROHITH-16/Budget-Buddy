@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, type FormEvent } from "react";
-import { updateProfile, sendPasswordResetEmail } from "firebase/auth";
+import { updateProfile, sendPasswordResetEmail, sendEmailVerification, reload } from "firebase/auth";
 import { User, Mail, KeyRound, Loader2, Save, CheckCircle2, AlertCircle, Phone, ShieldCheck, ShieldAlert, RefreshCw } from "lucide-react";
 import { auth, RecaptchaVerifier, linkWithPhoneNumber, type ConfirmationResult } from "@/firebase";
 import { useAuth } from "@/context/AuthContext";
@@ -47,8 +47,8 @@ export function ProfileSettings() {
 
   // ── Phone number + verification state (fetched from backend profile) ──────
   const [phone,           setPhone]           = useState<string | null>(null);
-  const [isEmailVerified, setIsEmailVerified] = useState<boolean | null>(null);
   const [isPhoneVerified, setIsPhoneVerified] = useState<boolean | null>(null);
+  // isEmailVerified is derived below from currentUser.emailVerified (not from state)
 
   // ── Resend activation email state ────────────────────────────────────────
   const [resendSending, setResendSending] = useState(false);
@@ -63,15 +63,21 @@ export function ProfileSettings() {
   const recaptchaRef = useRef<RecaptchaVerifier | null>(null);
 
   useEffect(() => {
+    // Reload the Firebase user to get the freshest emailVerified flag
+    if (auth.currentUser) {
+      reload(auth.currentUser).catch(() => {});
+    }
     api.get("/users/profile")
       .then((res) => {
         const data = res.data?.data;
         setPhone(data?.phone ?? null);
-        setIsEmailVerified(data?.isVerified ?? false);
         setIsPhoneVerified(data?.isPhoneVerified ?? false);
       })
       .catch(() => setPhone(null));
   }, [currentUser?.uid]);
+
+  // Derive email verified directly from Firebase (live, same as password reset flow)
+  const isEmailVerified = currentUser?.emailVerified ?? false;
 
   const email    = currentUser?.email ?? "";
   const initials = getInitials(currentUser?.displayName ?? null, email);
@@ -103,18 +109,18 @@ export function ProfileSettings() {
     }
   };
 
-  // ── Resend activation email ──────────────────────────────────────────────
+  // ── Resend Firebase email verification (same as password reset — no SMTP needed) ──
   const handleResendActivationEmail = async () => {
-    if (!email) return;
+    if (!auth.currentUser) return;
     setResendSending(true);
     setResendError(null);
     setResendSent(false);
     try {
-      await api.post("/users/send-activation-email", { email });
+      await sendEmailVerification(auth.currentUser);
       setResendSent(true);
       setTimeout(() => setResendSent(false), 8000);
     } catch (e: any) {
-      setResendError(e.response?.data?.error ?? "Failed to send activation email.");
+      setResendError(e.message ?? "Failed to send verification email.");
     } finally {
       setResendSending(false);
     }

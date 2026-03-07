@@ -14,6 +14,7 @@ import {
   signOut,
   onAuthStateChanged,
   sendPasswordResetEmail,
+  sendEmailVerification,
   updateProfile,
   RecaptchaVerifier,
   linkWithPhoneNumber,

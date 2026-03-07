@@ -13,7 +13,7 @@ import React, { useState, useRef, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { type FirebaseError } from "firebase/app";
-import { updateProfile, auth, RecaptchaVerifier, linkWithPhoneNumber, type ConfirmationResult } from "@/firebase";
+import { updateProfile, sendEmailVerification, auth, RecaptchaVerifier, linkWithPhoneNumber, type ConfirmationResult } from "@/firebase";
 import api from "@/api";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -110,6 +110,8 @@ export default function Register() {
   const [resendEmailSending, setResendEmailSending] = useState(false);
   const [resendEmailSent,    setResendEmailSent]    = useState(false);
   const [resendEmailError,   setResendEmailError]   = useState<string | null>(null);
+  // whether the initial activation email send succeeded
+  const [initialEmailFailed, setInitialEmailFailed] = useState(false);
 
   // phone-setup step — add/verify phone after email-verify
   const [setupCountryCode,  setSetupCountryCode]  = useState<string>("+91");
@@ -179,8 +181,15 @@ export default function Register() {
         console.error("Failed to save user profile to database:", dbError);
       }
 
-      // Step E: Send account activation email (fire-and-forget — never blocks signup)
-      api.post("/users/send-activation-email", { email: email.trim() }).catch(() => {});
+      // Step E: Send Firebase email verification (same infrastructure as password reset)
+      let emailSent = false;
+      try {
+        await sendEmailVerification(user);
+        emailSent = true;
+      } catch (mailErr: any) {
+        console.error("Email verification send failed:", mailErr);
+        emailSent = false;
+      }
 
       // If phone was entered, verify it via Firebase SMS before proceeding
       if (phoneNumber.trim()) {
@@ -204,6 +213,7 @@ export default function Register() {
       // Mark that this is a brand-new registration so the currency
       // setup dialog shows exactly once on the first dashboard visit.
       localStorage.setItem("showCurrencySetup", "true");
+      if (!emailSent) setInitialEmailFailed(true);
 
       // Show the email verification prompt before entering the app
       setStep("email-verify");
@@ -234,6 +244,11 @@ export default function Register() {
 
       setPhoneVerified(true);
       localStorage.setItem("showCurrencySetup", "true");
+      // Retry email verification if the initial attempt failed
+      if (initialEmailFailed && auth.currentUser) {
+        sendEmailVerification(auth.currentUser).catch(() => {});
+        setInitialEmailFailed(false);
+      }
       setStep("email-verify");
     } catch (err) {
       setErrorMessage("Invalid code. Please check and try again.");
@@ -248,18 +263,18 @@ export default function Register() {
     setStep("email-verify");
   }
 
-  // Resend activation email from the email-verify step
+  // Resend Firebase email verification from the email-verify step
   async function handleResendEmailFromStep(): Promise<void> {
-    if (!email.trim()) return;
+    if (!auth.currentUser) return;
     setResendEmailSending(true);
     setResendEmailError(null);
     setResendEmailSent(false);
     try {
-      await api.post("/users/send-activation-email", { email: email.trim() });
+      await sendEmailVerification(auth.currentUser);
       setResendEmailSent(true);
       setTimeout(() => setResendEmailSent(false), 8000);
     } catch (e: any) {
-      setResendEmailError(e.response?.data?.error ?? "Failed to resend. Please try again.");
+      setResendEmailError(e.message ?? "Failed to resend. Please try again.");
     } finally {
       setResendEmailSending(false);
     }
@@ -399,6 +414,16 @@ export default function Register() {
               </p>
               <p className="mt-0.5 text-sm font-semibold text-foreground">{email.trim()}</p>
             </div>
+
+            {/* Warning banner if initial send failed */}
+            {initialEmailFailed && !resendEmailSent && (
+              <div className="mb-4 rounded-xl border border-red-200 bg-red-50/70 dark:bg-red-900/10 dark:border-red-800/40 px-4 py-3">
+                <p className="text-sm font-semibold text-red-700 dark:text-red-400">Email could not be sent</p>
+                <p className="text-xs text-red-600 dark:text-red-300 mt-0.5">
+                  Our mail server may not be configured yet. Click <strong>Resend</strong> below to try again, or contact support.
+                </p>
+              </div>
+            )}
 
             {/* Info box */}
             <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50/70 dark:bg-amber-900/10 dark:border-amber-800/40 px-4 py-4 space-y-1.5">
