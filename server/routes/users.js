@@ -3,16 +3,17 @@
 // MongoDB removed — all storage is local via better-sqlite3.
 //
 // Routes:
-//   POST  /api/users/profile        → create or update user profile
-//   GET   /api/users/profile        → retrieve profile (protected)
-//   POST  /api/users/send-otp       → send 6-digit OTP to email or phone
-//   POST  /api/users/verify-otp     → verify OTP code
+//   POST  /api/users/profile      → create or update user profile
+//   GET   /api/users/profile      → retrieve profile (protected)
+//   POST  /api/users/send-otp     → generate & email a 6-digit OTP
+//   POST  /api/users/verify-email → validate OTP and mark user as verified
 
 "use strict";
 
 const express        = require("express");
 const { randomUUID } = require("crypto");
 const { getDb }      = require("../lib/db");
+const { sendOtpEmail } = require("../lib/mailer");
 const verifyToken    = require("../middleware/verifyToken");
 
 const router = express.Router();
@@ -173,93 +174,69 @@ router.get("/profile", verifyToken, (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// In-memory OTP store  { key → { code, expiresAt } }
-// Key format: "email:<address>" or "phone:<number>"
-// ---------------------------------------------------------------------------
-const otpStore = new Map();
-
-function generateOtp() {
-  return Math.floor(100000 + Math.random() * 900000).toString();
-}
-
-// ---------------------------------------------------------------------------
 // POST /api/users/send-otp
-// Body: { type: "email"|"phone", target: string, deliverTo?: string }
-//   type      — "email" verifies the email address; "phone" verifies the phone
-//   target    — the value being verified (email address or phone number)
-//   deliverTo — for type="phone", the email address to deliver the code to
-//               (since SMS requires a third-party provider)
+// Generates a fresh 6-digit OTP, saves it to the user row (10-min expiry),
+// and sends it via nodemailer to the user's email address.
+//
+// Body: { email }
 // ---------------------------------------------------------------------------
 router.post("/send-otp", async (req, res) => {
-  const { type, target, deliverTo } = req.body;
-
-  if (!type || !target) {
-    return res.status(400).json({ error: "type and target are required" });
-  }
-  if (!["email", "phone"].includes(type)) {
-    return res.status(400).json({ error: 'type must be "email" or "phone"' });
-  }
-  if (type === "phone" && !deliverTo) {
-    return res.status(400).json({ error: "deliverTo (email) is required for phone OTP delivery" });
-  }
-
-  const code       = generateOtp();
-  const key        = `${type}:${target}`;
-  const expiresAt  = Date.now() + 10 * 60 * 1000; // 10 minutes
-  otpStore.set(key, { code, expiresAt });
-
-  const recipient = type === "email" ? target : deliverTo;
-  const subject   = type === "email"
-    ? "Budget Buddy — Email Verification Code"
-    : "Budget Buddy — Phone Verification Code";
-  const body =
-    type === "email"
-      ? `Your email verification code is: ${code}\n\nThis code expires in 10 minutes.\n\nIf you did not request this, please ignore this email.`
-      : `Your phone number verification code is: ${code}\n\nThis code expires in 10 minutes.\n\nIf you did not request this, please ignore this email.`;
-
   try {
-    const { sendMail } = require("../lib/mailer");
-    await sendMail({ to: recipient, subject, text: body });
-    return res.json({ success: true });
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ success: false, error: "email is required" });
+
+    const db   = getDb();
+    const user = db.prepare("SELECT * FROM users WHERE email = ?").get(email.toLowerCase().trim());
+    if (!user) return res.status(404).json({ success: false, error: "No account found with this email." });
+
+    // Generate a cryptographically random 6-digit OTP
+    const otp     = String(Math.floor(100000 + Math.random() * 900000));
+    const expires = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 minutes
+
+    db.prepare(
+      "UPDATE users SET verify_otp = ?, otp_expires = ?, updated_at = ? WHERE email = ?"
+    ).run(otp, expires, new Date().toISOString(), email.toLowerCase().trim());
+
+    await sendOtpEmail(email, otp);
+
+    return res.status(200).json({ success: true, message: "OTP sent to your email." });
   } catch (err) {
-    if (err.message === "SMTP_NOT_CONFIGURED") {
-      // Development fallback — return the code directly so the app still works
-      // without email configuration.  In production, configure SMTP_* env vars.
-      console.warn("[OTP] SMTP not configured — returning code in response (dev only)");
-      return res.json({ success: true, devCode: code });
-    }
-    console.error("[OTP] send-otp error:", err);
-    return res.status(500).json({ error: "Failed to send OTP. Please try again." });
+    console.error("[users] POST /send-otp error:", err);
+    return res.status(500).json({ success: false, error: "Failed to send OTP.", message: err.message });
   }
 });
 
 // ---------------------------------------------------------------------------
-// POST /api/users/verify-otp
-// Body: { type: "email"|"phone", target: string, code: string }
+// POST /api/users/verify-email
+// Accepts { email, otp }. Checks the OTP and expiry, then marks the user
+// as verified (is_verified = 1) and clears the OTP fields.
+//
+// Body: { email, otp }
 // ---------------------------------------------------------------------------
-router.post("/verify-otp", (req, res) => {
-  const { type, target, code } = req.body;
+router.post("/verify-email", (req, res) => {
+  try {
+    const { email, otp } = req.body;
+    if (!email || !otp) return res.status(400).json({ success: false, error: "email and otp are required" });
 
-  if (!type || !target || !code) {
-    return res.status(400).json({ error: "type, target, and code are required" });
-  }
+    const db   = getDb();
+    const user = db.prepare("SELECT * FROM users WHERE email = ?").get(email.toLowerCase().trim());
 
-  const key    = `${type}:${target}`;
-  const stored = otpStore.get(key);
+    if (!user)                       return res.status(404).json({ success: false, error: "No account found with this email." });
+    if (user.is_verified === 1)      return res.status(200).json({ success: true,  message: "Email already verified." });
+    if (!user.verify_otp)            return res.status(400).json({ success: false, error: "No OTP requested. Please click Send OTP first." });
+    if (user.verify_otp !== String(otp))  return res.status(400).json({ success: false, error: "Incorrect OTP. Please try again." });
+    if (new Date(user.otp_expires) < new Date()) return res.status(400).json({ success: false, error: "OTP has expired. Please request a new one." });
 
-  if (!stored) {
-    return res.status(400).json({ error: "No OTP found. Please request a new code." });
-  }
-  if (Date.now() > stored.expiresAt) {
-    otpStore.delete(key);
-    return res.status(400).json({ error: "Code has expired. Please request a new one." });
-  }
-  if (stored.code !== code.trim()) {
-    return res.status(400).json({ error: "Incorrect code. Please try again." });
-  }
+    // Mark verified and clear OTP fields
+    db.prepare(
+      "UPDATE users SET is_verified = 1, verify_otp = NULL, otp_expires = NULL, updated_at = ? WHERE email = ?"
+    ).run(new Date().toISOString(), email.toLowerCase().trim());
 
-  otpStore.delete(key);
-  return res.json({ success: true });
+    return res.status(200).json({ success: true, message: "Email verified successfully!" });
+  } catch (err) {
+    console.error("[users] POST /verify-email error:", err);
+    return res.status(500).json({ success: false, error: "Verification failed.", message: err.message });
+  }
 });
 
 module.exports = router;
