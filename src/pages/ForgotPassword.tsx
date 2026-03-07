@@ -93,19 +93,28 @@ export default function ForgotPassword() {
               boxShadow: "0 4px 20px rgba(37,99,235,0.40), inset 0 1px 0 hsl(0 0% 100% / 0.25)",
             }}
           >
-            {/* Lock + question mark icon */}
+            {/* Lock with password dots + question mark */}
             <svg
               xmlns="http://www.w3.org/2000/svg"
               className="h-7 w-7 text-white"
               fill="none"
-              viewBox="0 0 24 24"
+              viewBox="0 0 28 28"
               stroke="currentColor"
-              strokeWidth={1.8}
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
             >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v.01M12 11.5c0-1 .7-1.8 1.5-2.3a3 3 0 10-4.5-2.6" />
-              <rect x="3" y="11" width="14" height="10" rx="2" strokeLinecap="round" strokeLinejoin="round" />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M7 11V7a5 5 0 0110 0v4" />
-              <text x="17" y="22" fontSize="7" fontWeight="bold" fill="white" stroke="none">?</text>
+              {/* Shackle */}
+              <path d="M6 12V8a6 6 0 0112 0v4" />
+              {/* Lock body */}
+              <rect x="2" y="12" width="18" height="12" rx="3" />
+              {/* Three dots */}
+              <circle cx="7"  cy="18" r="1" fill="white" stroke="none" />
+              <circle cx="11" cy="18" r="1" fill="white" stroke="none" />
+              <circle cx="15" cy="18" r="1" fill="white" stroke="none" />
+              {/* Question mark */}
+              <path d="M22 13.5c0-1 .8-1.5 1.5-1.5a1.5 1.5 0 010 3c-.5 0-.5.4-.5 1" stroke="white" strokeWidth={1.8} />
+              <circle cx="23" cy="19.5" r=".8" fill="white" stroke="none" />
             </svg>
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">
