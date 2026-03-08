@@ -13,7 +13,7 @@
 // Setup:
 //   Add to your .env file:  VITE_PHONE_EMAIL_CLIENT_ID=your-client-id-from-phone.email
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { signInWithCustomToken } from "@/firebase";
 import { auth } from "@/firebase";
@@ -26,7 +26,8 @@ import { Loader2, Phone, AlertCircle } from "lucide-react";
 // ---------------------------------------------------------------------------
 declare global {
   interface Window {
-    phoneEmailListener: (userJson: string | Record<string, unknown>) => void;
+    phoneEmailListener: (userObj: { user_json_url: string }) => void;
+    log_in_with_phone: (cfg: { client_id: string; success_url: string }) => void;
   }
 }
 
@@ -36,11 +37,9 @@ declare global {
 export default function PhoneSignIn() {
   const { currentUser }  = useAuth();
   const navigate         = useNavigate();
-  const scriptRef        = useRef<HTMLScriptElement | null>(null);
-  const btnContainerRef  = useRef<HTMLDivElement>(null);
 
-  const [status,    setStatus]    = useState<"idle" | "verifying" | "signing-in">("idle");
-  const [errorMsg,  setErrorMsg]  = useState<string | null>(null);
+  const [status,   setStatus]   = useState<"idle" | "verifying" | "signing-in">("idle");
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // ── Redirect if already signed in ─────────────────────────────────────
   useEffect(() => {
@@ -83,55 +82,30 @@ export default function PhoneSignIn() {
 
   // ── Register global callback BEFORE the Phone.Email script loads ───────
   useEffect(() => {
-    window.phoneEmailListener = (userJson) => {
-      // Phone.Email passes either the raw JWT string, or an object whose
-      // string form IS the JWT (some SDK versions differ).
-      const token =
-        typeof userJson === "string"
-          ? userJson
-          : (userJson as Record<string, unknown>).token as string | undefined
-            ?? JSON.stringify(userJson);
-
-      if (!token) {
-        setErrorMsg("Phone.Email did not return a valid token. Please try again.");
-        return;
-      }
-
-      handlePhoneEmailToken(token);
+    // Define listener first so it is ready the moment the widget fires it
+    window.phoneEmailListener = (userObj) => {
+      handlePhoneEmailToken(userObj.user_json_url);
     };
 
-    // ── Inject the Phone.Email widget script ───────────────────────────
     const clientId = import.meta.env.VITE_PHONE_EMAIL_CLIENT_ID as string | undefined;
     if (!clientId) {
-      console.warn(
-        "[PhoneSignIn] VITE_PHONE_EMAIL_CLIENT_ID is not set. " +
-        "Add it to your .env file to enable phone sign-in."
-      );
       setErrorMsg("Phone sign-in is not configured. VITE_PHONE_EMAIL_CLIENT_ID is missing.");
       return;
     }
 
-    // Set the data-client-id on the button container before loading the script
-    if (btnContainerRef.current) {
-      btnContainerRef.current.setAttribute("data-client-id", clientId);
-    }
-
-    // Only inject the script once
-    if (!document.querySelector('script[src*="phone.email"]')) {
-      const script   = document.createElement("script");
-      script.src     = "https://www.phone.email/sign_in_button_v1.js";
-      script.async   = true;
-      scriptRef.current = script;
-      document.body.appendChild(script);
-    }
+    const script = document.createElement("script");
+    script.src   = "https://auth.phone.email/login_automated_v1_2.js";
+    script.async = true;
+    script.onload = () => {
+      if (typeof window.log_in_with_phone === "function") {
+        window.log_in_with_phone({ client_id: clientId, success_url: "" });
+      }
+    };
+    document.body.appendChild(script);
 
     return () => {
-      // Cleanup: remove the script tag on unmount so it doesn't double-load
-      // if the user navigates away and back.
-      if (scriptRef.current && document.body.contains(scriptRef.current)) {
-        document.body.removeChild(scriptRef.current);
-        scriptRef.current = null;
-      }
+      if (document.body.contains(script)) document.body.removeChild(script);
+      delete (window as unknown as Record<string, unknown>).phoneEmailListener;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -205,16 +179,11 @@ export default function PhoneSignIn() {
         )}
 
         {/* ── Phone.Email button ──────────────────────────────────────── */}
-        {/* The script targets elements with class="pe_signin_button"      */}
-        {/* and replaces them with the Phone.Email sign-in button widget.  */}
+        {/* Phone.Email injects its widget into #pheIncludedContent       */}
         <div
           className={`flex justify-center transition-opacity ${isBusy ? "pointer-events-none opacity-40" : ""}`}
         >
-          <div
-            ref={btnContainerRef}
-            className="pe_signin_button"
-            // data-client-id is set dynamically in useEffect once env is read
-          />
+          <div id="pheIncludedContent" />
         </div>
 
         {/* ── Divider ─────────────────────────────────────────────────── */}
