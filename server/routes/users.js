@@ -23,15 +23,13 @@ const router = express.Router();
 // ---------------------------------------------------------------------------
 function toPublicProfile(row) {
   return {
-    id:              row.id,
-    firebaseUid:     row.firebase_uid,
-    name:            row.name,
-    email:           row.email,
-    phone:           row.phone || null,
-    isVerified:      row.is_verified === 1,
-    isPhoneVerified: row.is_phone_verified === 1,
-    createdAt:       row.created_at,
-    updatedAt:       row.updated_at,
+    id:          row.id,
+    firebaseUid: row.firebase_uid,
+    name:        row.name,
+    email:       row.email,
+    phone:       row.phone || null,
+    createdAt:   row.created_at,
+    updatedAt:   row.updated_at,
   };
 }
 

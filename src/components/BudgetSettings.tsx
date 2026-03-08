@@ -71,8 +71,6 @@ export function BudgetSettings() {
   const handleToggle = async (on: boolean) => {
     setEnabled(on);
     localStorage.setItem("budgetEnabled", String(on));
-    // Always notify Dashboard immediately so it hides/shows warnings right away
-    window.dispatchEvent(new CustomEvent("budgetEnabledChange", { detail: { enabled: on } }));
     if (!on) {
       // Save limit as 0 to disable budget tracking on the backend too
       try {

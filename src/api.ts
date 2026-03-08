@@ -73,13 +73,20 @@ api.interceptors.request.use(
         // Attach the token as a Bearer token in the Authorization header.
         // Express middleware (verifyToken.js) reads this header to authenticate requests.
         config.headers.Authorization = `Bearer ${token}`;
-      } catch (tokenError) {
-        // Failed to get token — could mean the session is invalid.
-        // Log the error and proceed without the token so the server returns 401.
-        console.error(
-          "[api] Failed to retrieve Firebase ID token for request:",
-          tokenError
-        );
+      } catch {
+        // First attempt failed (e.g. net::ERR_NETWORK_CHANGED).
+        // Try a forced refresh once before giving up.
+        try {
+          const token: string = await firebaseUser.getIdToken(true);
+          config.headers.Authorization = `Bearer ${token}`;
+        } catch (tokenError) {
+          // Both attempts failed — log and proceed without token so the
+          // server returns 401 rather than hanging indefinitely.
+          console.error(
+            "[api] Failed to retrieve Firebase ID token for request:",
+            tokenError
+          );
+        }
       }
     }
     // If no user is logged in, no Authorization header is added.
