@@ -269,273 +269,261 @@ export default function Register() {
   // Render
   // -------------------------------------------------------------------------
   return (
-    <div className="flex min-h-screen items-center justify-center bg-transparent px-4">
-      <div className="w-full max-w-md rounded-2xl p-8" style={{ background: "rgba(255,255,255,0.85)", border: "1px solid rgba(255,255,255,0.95)", boxShadow: "0 4px 16px rgba(124,58,237,0.10), 0 12px 48px rgba(124,58,237,0.08), inset 0 1px 0 rgba(255,255,255,1)", backdropFilter: "blur(20px)" }}>
+    <div className="flex min-h-screen">
+      {/* ================================================================ */}
+      {/* Left branding panel (desktop only)                               */}
+      {/* ================================================================ */}
+      <div
+        className="hidden lg:flex lg:w-5/12 flex-col justify-between px-12 py-10 relative overflow-hidden"
+        style={{ background: "linear-gradient(145deg, #3730a3, #4f46e5, #7c3aed)" }}
+      >
+        {/* Decorative shapes */}
+        <div className="absolute top-16 right-10 h-20 w-20 rounded-2xl bg-white/10 rotate-12" />
+        <div className="absolute top-36 right-28 h-10 w-10 rounded-full bg-white/10" />
+        <div className="absolute bottom-40 left-8 h-14 w-14 rounded-2xl bg-white/10 -rotate-12" />
+        <div className="absolute bottom-20 left-24 h-8 w-8 rotate-45 bg-white/10" />
+        <div className="absolute top-1/2 right-6 h-6 w-6 rounded-full bg-white/10" />
 
-        {/* ================================================================ */}
-        {/* Main registration form                                            */}
-        {/* ================================================================ */}
-        <>
-        {/* ---------------------------------------------------------------- */}
-        {/* Header                                                            */}
-        {/* ---------------------------------------------------------------- */}
-        <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full"
-            style={{
-              background: "linear-gradient(135deg, #0ea5e9, #2563eb)",
-              boxShadow: "0 4px 20px rgba(37,99,235,0.40), inset 0 1px 0 rgba(255,255,255,0.25)",
-            }}
-          >
-            {/* Add user / signup icon */}
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-7 w-7 text-white"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={1.8}
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h11" />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 11v6m-3-3h6" />
-            </svg>
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">
-            Create your account
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Start tracking your finances with Budget Buddy
+        {/* Logo */}
+        <div className="flex items-center gap-3 z-10">
+          <img src="/logo.png" alt="Budget Buddy" className="h-10 w-10 rounded-xl object-contain bg-white/10 p-1" />
+          <span className="text-lg font-bold text-white">Budget Buddy</span>
+        </div>
+
+        {/* Center text */}
+        <div className="z-10">
+          <h2 className="text-4xl font-bold text-white leading-tight mb-4">Join Budget Buddy</h2>
+          <p className="text-indigo-200 text-base leading-relaxed">
+            Create your account and start tracking finances with smart insights and beautiful charts.
           </p>
         </div>
 
-        {/* ---------------------------------------------------------------- */}
-        {/* Error message                                                     */}
-        {/* ---------------------------------------------------------------- */}
-        {errorMessage && (
-          <div className="mb-5 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3">
-            <p className="text-sm text-destructive">{errorMessage}</p>
-          </div>
-        )}
+        {/* Footer */}
+        <p className="text-indigo-300 text-xs z-10">© {new Date().getFullYear()} Budget Buddy. All rights reserved.</p>
+      </div>
 
-        {/* ---------------------------------------------------------------- */}
-        {/* Registration form                                                 */}
-        {/* ---------------------------------------------------------------- */}
-        <form onSubmit={handleEmailRegister} noValidate className="space-y-4">
-          {/* Full Name */}
-          <div className="space-y-1.5">
-            <label
-              htmlFor="register-name"
-              className="block text-sm font-medium text-foreground"
-            >
-              Full Name
-            </label>
-            <input
-              id="register-name"
-              type="text"
-              autoComplete="name"
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50"
-              placeholder="John Doe"
-              disabled={isSubmitting || isGoogleSubmitting}
-            />
+      {/* ================================================================ */}
+      {/* Right form panel                                                  */}
+      {/* ================================================================ */}
+      <div className="flex flex-1 flex-col items-center justify-center bg-white px-6 py-12 overflow-y-auto">
+        <div className="w-full max-w-md">
+
+          {/* Mobile-only logo */}
+          <div className="mb-8 flex justify-center lg:hidden">
+            <img src="/logo.png" alt="Budget Buddy" className="h-14 w-14 rounded-2xl object-contain" />
           </div>
 
-          {/* Phone Number with Country Code */}
-          <div className="space-y-1.5">
-            <label
-              htmlFor="register-phone"
-              className="block text-sm font-medium text-foreground"
-            >
-              Phone Number
-            </label>
-            <div className="flex gap-2">
-              {/* Country Code Selector */}
-              <Select
-                value={countryCode}
-                onValueChange={setCountryCode}
-                disabled={isSubmitting || isGoogleSubmitting}
-              >
-                <SelectTrigger className="w-[100px] rounded-lg border border-input bg-background text-sm text-foreground focus:ring-2 focus:ring-primary focus:ring-offset-1">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-card border-border">
-                  <SelectItem value="+91" className="text-foreground">+91 (IN)</SelectItem>
-                  <SelectItem value="+1" className="text-foreground">+1 (US)</SelectItem>
-                  <SelectItem value="+44" className="text-foreground">+44 (UK)</SelectItem>
-                  <SelectItem value="+61" className="text-foreground">+61 (AU)</SelectItem>
-                  <SelectItem value="+49" className="text-foreground">+49 (DE)</SelectItem>
-                  <SelectItem value="+81" className="text-foreground">+81 (JP)</SelectItem>
-                  <SelectItem value="+971" className="text-foreground">+971 (AE)</SelectItem>
-                  <SelectItem value="+65" className="text-foreground">+65 (SG)</SelectItem>
-                </SelectContent>
-              </Select>
+          {/* Heading */}
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-gray-900">Create Account</h1>
+            <p className="mt-1 text-sm text-gray-500">Start tracking your finances with Budget Buddy</p>
+          </div>
 
-              {/* Phone Number Input */}
-              <input
-                id="register-phone"
-                type="tel"
-                inputMode="numeric"
-                autoComplete="tel"
-                value={phoneNumber}
-                onChange={(e) => {
-                  // Allow digits only
-                  const digits = e.target.value.replace(/\D/g, "");
-                  const maxLen = phoneMaxLengths[countryCode] ?? 15;
-                  setPhoneNumber(digits.slice(0, maxLen));
-                }}
-                className="flex-1 rounded-lg border border-input bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50"
-                placeholder={phonePlaceholders[countryCode] || "Enter phone number"}
-                maxLength={phoneMaxLengths[countryCode] ?? 15}
-                disabled={isSubmitting || isGoogleSubmitting}
-              />
+          {/* Error message */}
+          {errorMessage && (
+            <div className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+              <p className="text-sm text-red-600">{errorMessage}</p>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Digits only · {phoneMaxLengths[countryCode] ?? 15} digits required for {countryCode} · Optional
-            </p>
-          </div>
-
-          {/* Email */}
-          <div className="space-y-1.5">
-            <label
-              htmlFor="register-email"
-              className="block text-sm font-medium text-foreground"
-            >
-              Email address
-            </label>
-            <input
-              id="register-email"
-              type="email"
-              autoComplete="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50"
-              placeholder="you@example.com"
-              disabled={isSubmitting || isGoogleSubmitting}
-            />
-          </div>
-
-          {/* Password */}
-          <div className="space-y-1.5">
-            <label
-              htmlFor="register-password"
-              className="block text-sm font-medium text-foreground"
-            >
-              Password
-            </label>
-            <input
-              id="register-password"
-              type="password"
-              autoComplete="new-password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50"
-              placeholder="Strong password required"
-              disabled={isSubmitting || isGoogleSubmitting}
-            />
-            <p className="text-xs text-muted-foreground/60 mt-1">
-              Must be at least 8 characters, include an uppercase letter, a number, and a special character (@$!%*?&).
-            </p>
-          </div>
-
-          {/* Confirm password */}
-          <div className="space-y-1.5">
-            <label
-              htmlFor="register-confirm-password"
-              className="block text-sm font-medium text-foreground"
-            >
-              Confirm password
-            </label>
-            <input
-              id="register-confirm-password"
-              type="password"
-              autoComplete="new-password"
-              required
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50"
-              placeholder="Re-enter password"
-              disabled={isSubmitting || isGoogleSubmitting}
-            />
-          </div>
-
-          {/* Submit button */}
-          <button
-            type="submit"
-            disabled={isSubmitting || isGoogleSubmitting}
-            className="mt-2 w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {isSubmitting ? "Creating account…" : "Create account"}
-          </button>
-        </form>
-
-        {/* ---------------------------------------------------------------- */}
-        {/* Divider                                                           */}
-        {/* ---------------------------------------------------------------- */}
-        <div className="relative my-6">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-border" />
-          </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-card px-2 text-muted-foreground">or continue with</span>
-          </div>
-        </div>
-
-        {/* ---------------------------------------------------------------- */}
-        {/* Google sign-up button                                             */}
-        {/* ---------------------------------------------------------------- */}
-        <button
-          type="button"
-          onClick={handleGoogleSignUp}
-          disabled={isSubmitting || isGoogleSubmitting}
-          className="flex w-full items-center justify-center gap-3 rounded-lg border border-border bg-background px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <svg className="h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">
-            <path
-              d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-              fill="#4285F4"
-            />
-            <path
-              d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-              fill="#34A853"
-            />
-            <path
-              d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"
-              fill="#FBBC05"
-            />
-            <path
-              d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-              fill="#EA4335"
-            />
-          </svg>
-          {isGoogleSubmitting ? "Signing up…" : "Continue with Google"}
-        </button>
-
-        {/* ---------------------------------------------------------------- */}
-        {/* Phone.Email sign-up widget                                       */}
-        {/* ---------------------------------------------------------------- */}
-        <div className="mt-2 flex flex-col items-center">
-          <div id="pheIncludedContent" />
-          {isPhoneSubmitting && (
-            <p className="mt-2 text-xs text-muted-foreground">Verifying phone…</p>
           )}
-        </div>
 
-        {/* ---------------------------------------------------------------- */}
-        {/* Footer — link to login                                           */}
-        {/* ---------------------------------------------------------------- */}
-        <p className="mt-6 text-center text-sm text-muted-foreground">
-          Already have an account?{" "}
-          <Link
-            to="/login"
-            className="font-medium text-primary underline-offset-4 hover:underline"
-          >
-            Sign in
-          </Link>
-        </p>
-        </>
+          {/* Registration form */}
+          <form onSubmit={handleEmailRegister} noValidate className="space-y-4">
+            {/* Full Name */}
+            <div>
+              <label htmlFor="register-name" className="block text-sm font-medium text-gray-700 mb-1.5">
+                Full Name
+              </label>
+              <div className="relative">
+                <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center">
+                  <svg className="h-4 w-4 text-gray-400" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/>
+                  </svg>
+                </span>
+                <input
+                  id="register-name"
+                  type="text"
+                  autoComplete="name"
+                  required
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-4 py-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50"
+                  placeholder="John Doe"
+                  disabled={isSubmitting || isGoogleSubmitting}
+                />
+              </div>
+            </div>
+
+            {/* Phone Number with Country Code */}
+            <div>
+              <label htmlFor="register-phone" className="block text-sm font-medium text-gray-700 mb-1.5">
+                Phone Number <span className="text-gray-400 font-normal">(Optional)</span>
+              </label>
+              <div className="flex gap-2">
+                <Select value={countryCode} onValueChange={setCountryCode} disabled={isSubmitting || isGoogleSubmitting}>
+                  <SelectTrigger className="w-[100px] rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-900 focus:ring-2 focus:ring-indigo-500">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white border-gray-200">
+                    <SelectItem value="+91">+91 (IN)</SelectItem>
+                    <SelectItem value="+1">+1 (US)</SelectItem>
+                    <SelectItem value="+44">+44 (UK)</SelectItem>
+                    <SelectItem value="+61">+61 (AU)</SelectItem>
+                    <SelectItem value="+49">+49 (DE)</SelectItem>
+                    <SelectItem value="+81">+81 (JP)</SelectItem>
+                    <SelectItem value="+971">+971 (AE)</SelectItem>
+                    <SelectItem value="+65">+65 (SG)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <input
+                  id="register-phone"
+                  type="tel"
+                  inputMode="numeric"
+                  autoComplete="tel"
+                  value={phoneNumber}
+                  onChange={(e) => {
+                    const digits = e.target.value.replace(/\D/g, "");
+                    const maxLen = phoneMaxLengths[countryCode] ?? 15;
+                    setPhoneNumber(digits.slice(0, maxLen));
+                  }}
+                  className="flex-1 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50"
+                  placeholder={phonePlaceholders[countryCode] || "Enter phone number"}
+                  maxLength={phoneMaxLengths[countryCode] ?? 15}
+                  disabled={isSubmitting || isGoogleSubmitting}
+                />
+              </div>
+            </div>
+
+            {/* Email */}
+            <div>
+              <label htmlFor="register-email" className="block text-sm font-medium text-gray-700 mb-1.5">
+                Email address
+              </label>
+              <div className="relative">
+                <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center">
+                  <svg className="h-4 w-4 text-gray-400" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4-8 5-8-5V6l8 5 8-5v2z"/>
+                  </svg>
+                </span>
+                <input
+                  id="register-email"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-4 py-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50"
+                  placeholder="you@example.com"
+                  disabled={isSubmitting || isGoogleSubmitting}
+                />
+              </div>
+            </div>
+
+            {/* Password */}
+            <div>
+              <label htmlFor="register-password" className="block text-sm font-medium text-gray-700 mb-1.5">
+                Password
+              </label>
+              <div className="relative">
+                <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center">
+                  <svg className="h-4 w-4 text-gray-400" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
+                  </svg>
+                </span>
+                <input
+                  id="register-password"
+                  type="password"
+                  autoComplete="new-password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-4 py-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50"
+                  placeholder="Strong password required"
+                  disabled={isSubmitting || isGoogleSubmitting}
+                />
+              </div>
+              <p className="mt-1.5 text-xs text-gray-400">
+                Min 8 chars, uppercase, number & special character (@$!%*?&)
+              </p>
+            </div>
+
+            {/* Confirm Password */}
+            <div>
+              <label htmlFor="register-confirm-password" className="block text-sm font-medium text-gray-700 mb-1.5">
+                Confirm Password
+              </label>
+              <div className="relative">
+                <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center">
+                  <svg className="h-4 w-4 text-gray-400" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
+                  </svg>
+                </span>
+                <input
+                  id="register-confirm-password"
+                  type="password"
+                  autoComplete="new-password"
+                  required
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-4 py-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50"
+                  placeholder="Re-enter password"
+                  disabled={isSubmitting || isGoogleSubmitting}
+                />
+              </div>
+            </div>
+
+            {/* Submit button */}
+            <button
+              type="submit"
+              disabled={isSubmitting || isGoogleSubmitting}
+              className="mt-2 w-full rounded-xl py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+              style={{ background: "linear-gradient(135deg, #4f46e5, #7c3aed)" }}
+            >
+              {isSubmitting ? "Creating account…" : "Create Account"}
+            </button>
+          </form>
+
+          {/* Divider */}
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-200" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-white px-3 text-gray-400 tracking-wider">or continue with</span>
+            </div>
+          </div>
+
+          {/* Google + Phone buttons */}
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={handleGoogleSignUp}
+              disabled={isSubmitting || isGoogleSubmitting}
+              className="flex flex-1 items-center justify-center gap-2.5 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <svg className="h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+              </svg>
+              {isGoogleSubmitting ? "Signing up…" : "Google"}
+            </button>
+            <div className="flex flex-1 flex-col items-center">
+              <div id="pheIncludedContent" className="w-full" />
+              {isPhoneSubmitting && (
+                <p className="mt-1 text-xs text-gray-400">Verifying phone…</p>
+              )}
+            </div>
+          </div>
+
+          {/* Footer */}
+          <p className="mt-8 text-center text-sm text-gray-500">
+            Already have an account?{" "}
+            <Link to="/login" className="font-semibold text-indigo-600 hover:text-indigo-700">
+              Sign in
+            </Link>
+          </p>
+        </div>
       </div>
     </div>
   );
