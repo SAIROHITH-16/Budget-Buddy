@@ -215,13 +215,19 @@ export default function Register() {
       localStorage.setItem("showCurrencySetup", "true");
 
       // Step E: Send Firebase email verification (non-fatal if it fails)
+      let verifyEmailError: string | null = null;
       try {
         await sendEmailVerification(user);
-      } catch {
-        // User can resend from the verify-email page
+      } catch (verifyErr: unknown) {
+        verifyEmailError =
+          verifyErr instanceof Error ? verifyErr.message : String(verifyErr);
+        console.error("[Register] sendEmailVerification failed:", verifyEmailError);
       }
 
-      navigate("/verify-email", { replace: true });
+      navigate("/verify-email", {
+        replace: true,
+        state: verifyEmailError ? { sendError: verifyEmailError } : undefined,
+      });
     } catch (err) {
       setErrorMessage(parseFirebaseError(err));
     } finally {

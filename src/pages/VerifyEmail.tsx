@@ -10,7 +10,7 @@
 //   4. "Sign out" link in case they used a wrong email address.
 
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { sendEmailVerification, reload } from "firebase/auth";
 import { useAuth } from "@/context/AuthContext";
 import { auth } from "@/firebase";
@@ -36,6 +36,11 @@ const RESEND_COOLDOWN_SECONDS = 60;
 export default function VerifyEmail() {
   const { currentUser, signOutUser } = useAuth();
   const navigate = useNavigate();
+  const location  = useLocation();
+
+  // Error forwarded from Register.tsx if sendEmailVerification failed at signup
+  const initialSendError: string | null =
+    (location.state as { sendError?: string } | null)?.sendError ?? null;
 
   const [resendCooldown, setResendCooldown] = useState(0);
   const [resendSending, setResendSending] = useState(false);
@@ -146,6 +151,14 @@ export default function VerifyEmail() {
             </p>
           )}
 
+          {/* ── Error from initial send at registration ────────────── */}
+          {initialSendError && (
+            <p className="flex items-start gap-2 rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-800">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+              <span><strong>Initial email failed to send:</strong> {initialSendError}. Use the Resend button below.</span>
+            </p>
+          )}
+
           {/* ── Resend button ──────────────────────────────────────────── */}
           <Button
             variant="outline"
@@ -192,8 +205,8 @@ export default function VerifyEmail() {
           </Button>
 
           <p className="text-center text-xs text-muted-foreground">
-            Didn't receive the email? Check your spam folder or wait 60 seconds
-            before resending.
+            Didn&apos;t receive the email? Check your spam folder, wait 60 seconds,
+            then use <strong>Resend</strong> above.
           </p>
         </CardContent>
       </Card>
