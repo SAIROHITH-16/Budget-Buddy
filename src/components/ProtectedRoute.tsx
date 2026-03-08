@@ -46,10 +46,16 @@ export function ProtectedRoute({ redirectTo = "/login" }: ProtectedRouteProps) {
     );
   }
 
+  // Phone-authenticated users have emailVerified === false by design.
+  // Allow them through — they authenticated via SMS OTP, no email to verify.
+  const isPhoneUser = currentUser?.providerData.some(
+    (p) => p.providerId === "phone"
+  );
+
   // User is authenticated but email unverified — block access to private routes.
   // Google OAuth users always have emailVerified === true, so this only gates
   // email+password accounts that haven't clicked their verification link yet.
-  if (currentUser !== null && !currentUser.emailVerified) {
+  if (currentUser !== null && !currentUser.emailVerified && !isPhoneUser) {
     return <Navigate to="/verify-email" replace />;
   }
 
