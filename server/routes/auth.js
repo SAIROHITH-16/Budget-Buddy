@@ -2,42 +2,44 @@
 // Authentication routes that sit outside Firebase's standard email/password flow.
 //
 // Routes:
-//   POST /api/auth/verify-phone-email  → verify a Phone.Email JWT and return
+//   POST /api/auth/verify-phone-email  → verify a Phone.Email user_json_url and return
 //                                        a Firebase Custom Token for sign-in
 
 "use strict";
 
-const express        = require("express");
-const jwt            = require("jsonwebtoken");
-const { randomUUID } = require("crypto");
-const { adminAuth }  = require("../firebaseAdmin");
-const { getDb }      = require("../lib/db");
+const express          = require("express");
+const { createHmac }   = require("crypto");
+const { randomUUID }   = require("crypto");
+const { adminAuth }    = require("../firebaseAdmin");
+const { getDb }        = require("../lib/db");
 
 const router = express.Router();
 
 // ---------------------------------------------------------------------------
 // POST /api/auth/verify-phone-email
 // ---------------------------------------------------------------------------
-// Called by the frontend after Phone.Email redirects back with a signed JWT.
-// The JWT was issued by Phone.Email and should be verified with the shared
-// secret stored in process.env.PHONE_EMAIL_SECRET.
+// Called by the frontend after Phone.Email's login_automated_v1_2.js widget
+// fires window.phoneEmailListener({ user_json_url }).
 //
-// Body:    { token: "<JWT from Phone.Email>" }
+// The frontend sends: { token: "<user_json_url>" }
+//
+// This route:
+//   1. Validates the URL is from phone.email
+//   2. Fetches the URL to retrieve { country_code, phone_no, hmac, ... }
+//   3. Verifies the HMAC with PHONE_EMAIL_CLIENT_SECRET
+//   4. Upserts the user in SQLite
+//   5. Returns a Firebase Custom Token
+//
 // Returns: { success: true, customToken: "<Firebase Custom Token>", phone }
-//
-// The frontend must call:
-//   import { signInWithCustomToken } from "firebase/auth";
-//   await signInWithCustomToken(auth, customToken);
-// to complete the Firebase sign-in session.
 // ---------------------------------------------------------------------------
 router.post("/verify-phone-email", async (req, res) => {
   try {
     // ── 1. Validate request body ────────────────────────────────────────────
-    const { token } = req.body;
-    if (!token || typeof token !== "string") {
+    const { token: user_json_url } = req.body;
+    if (!user_json_url || typeof user_json_url !== "string") {
       return res.status(400).json({
         success: false,
-        error: "token is required in the request body.",
+        error: "token (user_json_url) is required in the request body.",
       });
     }
 
@@ -49,37 +51,59 @@ router.post("/verify-phone-email", async (req, res) => {
       });
     }
 
-    const secret = process.env.PHONE_EMAIL_SECRET;
-    if (!secret) {
-      console.error("[auth] PHONE_EMAIL_SECRET is not set in server/.env");
-      return res.status(503).json({
-        success: false,
-        error: "Server misconfigured: PHONE_EMAIL_SECRET is missing.",
-      });
-    }
-
-    // ── 3. Verify the Phone.Email JWT ───────────────────────────────────────
-    // Phone.Email signs its callback token with a secret you configure in
-    // their dashboard (Settings → Webhook Secret). Store that value in .env
-    // as PHONE_EMAIL_SECRET.
-    let decoded;
+    // ── 3. Validate the URL is actually from phone.email ───────────────────
+    let parsedUrl;
     try {
-      decoded = jwt.verify(token, secret, { algorithms: ["HS256"] });
-    } catch (jwtErr) {
-      return res.status(401).json({
+      parsedUrl = new URL(user_json_url);
+    } catch {
+      return res.status(400).json({ success: false, error: "Invalid user_json_url." });
+    }
+    if (!parsedUrl.hostname.endsWith("phone.email")) {
+      return res.status(400).json({
         success: false,
-        error:   "Invalid or expired Phone.Email verification token.",
-        details: jwtErr.message,
+        error: "user_json_url must be from the phone.email domain.",
       });
     }
 
-    // ── 4. Extract and format the phone number ──────────────────────────────
-    // Phone.Email payload contains: { country_code: "91", phone_no: "9876543210", ... }
-    const { country_code, phone_no } = decoded;
+    // ── 4. Fetch user data from Phone.Email ────────────────────────────────
+    let userData;
+    try {
+      const resp = await fetch(user_json_url);
+      if (!resp.ok) {
+        return res.status(401).json({
+          success: false,
+          error: `Phone.Email returned HTTP ${resp.status} for user_json_url.`,
+        });
+      }
+      userData = await resp.json();
+    } catch (fetchErr) {
+      return res.status(502).json({
+        success: false,
+        error: "Failed to fetch user data from Phone.Email.",
+        details: fetchErr.message,
+      });
+    }
+
+    // ── 5. HMAC verification (optional but recommended) ────────────────────
+    // If PHONE_EMAIL_CLIENT_SECRET is set, verify the response HMAC so we know
+    // the data hasn't been tampered with. Skip silently if secret not configured.
+    const clientSecret = process.env.PHONE_EMAIL_CLIENT_SECRET || process.env.PHONE_EMAIL_SECRET;
+    if (clientSecret && userData.hmac) {
+      const { country_code: cc, phone_no: pn, timestamp } = userData;
+      const expected = createHmac("sha256", clientSecret)
+        .update(`${cc}${pn}${timestamp}`)
+        .digest("hex");
+      if (expected !== userData.hmac) {
+        return res.status(401).json({ success: false, error: "Phone.Email HMAC verification failed." });
+      }
+    }
+
+    // ── 6. Extract and format the phone number ──────────────────────────────
+    const { country_code, phone_no } = userData;
     if (!country_code || !phone_no) {
       return res.status(400).json({
         success: false,
-        error: "Phone.Email token payload is missing country_code or phone_no.",
+        error: "Phone.Email response is missing country_code or phone_no.",
       });
     }
 
