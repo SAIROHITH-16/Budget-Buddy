@@ -20,16 +20,15 @@ const mongoose = require("mongoose");
 const userSchema = new mongoose.Schema(
   {
     // -----------------------------------------------------------------------
-    // firebaseUid — Firebase user ID (unique identifier)
-    // This is the primary key that links back to Firebase Auth.
-    // Must be unique across all documents and is indexed for fast lookups.
+    // firebaseUid — Firebase user ID (optional for native-registration users)
     // -----------------------------------------------------------------------
     firebaseUid: {
       type: String,
-      required: [true, "Firebase UID is required"],
+      required: false,
       unique: true,
+      sparse: true,   // allows multiple null values in the unique index
       trim: true,
-      index: true,  // Indexed for fast user lookups by Firebase UID
+      index: true,
     },
 
     // -----------------------------------------------------------------------
@@ -62,8 +61,6 @@ const userSchema = new mongoose.Schema(
 
     // -----------------------------------------------------------------------
     // phone — User's phone number (required)
-    // Required field with country code for contact and verification purposes.
-    // Format: +[country code][phone number] (e.g., +911234567890, +11234567890)
     // -----------------------------------------------------------------------
     phone: {
       type: String,
@@ -71,12 +68,41 @@ const userSchema = new mongoose.Schema(
       trim: true,
       validate: {
         validator: function(v) {
-          // Must start with + followed by digits (country code + phone number)
-          // Accepts: +911234567890, +11234567890, +441234567890, etc.
           return /^\+\d{1,4}\d{6,14}$/.test(v);
         },
         message: "Please provide a valid phone number with country code (e.g., +911234567890)",
       },
+    },
+
+    // -----------------------------------------------------------------------
+    // password — bcrypt-hashed password (only set for native-registration users)
+    // -----------------------------------------------------------------------
+    password: {
+      type: String,
+      required: false,
+      select: false,  // never returned in queries by default
+    },
+
+    // -----------------------------------------------------------------------
+    // OTP fields — used during native phone-verification registration
+    // -----------------------------------------------------------------------
+    otpCode: {
+      type:     String,
+      required: false,
+      select:   false,
+    },
+    otpExpiry: {
+      type:     Date,
+      required: false,
+      select:   false,
+    },
+
+    // -----------------------------------------------------------------------
+    // isPhoneVerified — true once the user completes SMS OTP verification
+    // -----------------------------------------------------------------------
+    isPhoneVerified: {
+      type:    Boolean,
+      default: false,
     },
   },
   {
