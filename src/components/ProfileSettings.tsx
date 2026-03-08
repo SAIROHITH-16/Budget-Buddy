@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef, type FormEvent } from "react";
+import { useState, useEffect } from "react";
 import { updateProfile, sendPasswordResetEmail, sendEmailVerification, reload } from "firebase/auth";
 import { User, Mail, KeyRound, Loader2, Save, CheckCircle2, AlertCircle, Phone, ShieldCheck, ShieldAlert, RefreshCw } from "lucide-react";
-import { auth, RecaptchaVerifier, linkWithPhoneNumber, type ConfirmationResult } from "@/firebase";
+import { auth } from "@/firebase";
 import { useAuth } from "@/context/AuthContext";
 import api from "@/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -50,17 +50,10 @@ export function ProfileSettings() {
   const [isPhoneVerified, setIsPhoneVerified] = useState<boolean | null>(null);
   // isEmailVerified is derived below from currentUser.emailVerified (not from state)
 
-  // ── Resend activation email state ────────────────────────────────────────
+  // ── Resend activation email state ─────────────────────────────────────────
   const [resendSending, setResendSending] = useState(false);
   const [resendSent,    setResendSent]    = useState(false);
   const [resendError,   setResendError]   = useState<string | null>(null);
-
-  // ── Phone OTP state ───────────────────────────────────────────────────────
-  const [phoneOtpStep,       setPhoneOtpStep]       = useState<"idle" | "sending" | "otp" | "verifying">("idle");
-  const [phoneOtpCode,       setPhoneOtpCode]       = useState("");
-  const [phoneOtpError,      setPhoneOtpError]      = useState<string | null>(null);
-  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
-  const recaptchaRef = useRef<RecaptchaVerifier | null>(null);
 
   useEffect(() => {
     // Reload the Firebase user to get the freshest emailVerified flag
@@ -123,54 +116,6 @@ export function ProfileSettings() {
       setResendError(e.message ?? "Failed to send verification email.");
     } finally {
       setResendSending(false);
-    }
-  };
-
-  // ── Send phone OTP via Firebase ──────────────────────────────────────────
-  const handleSendPhoneOtp = async () => {
-    if (!phone || !auth.currentUser) return;
-    setPhoneOtpStep("sending");
-    setPhoneOtpError(null);
-    try {
-      if (recaptchaRef.current) { recaptchaRef.current.clear(); recaptchaRef.current = null; }
-      const verifier = new RecaptchaVerifier(auth, "settings-recaptcha-container", { size: "invisible" });
-      recaptchaRef.current = verifier;
-      const result = await linkWithPhoneNumber(auth.currentUser, phone, verifier);
-      setConfirmationResult(result);
-      setPhoneOtpStep("otp");
-    } catch (err: any) {
-      if (err.code === "auth/provider-already-linked" || err.code === "auth/credential-already-in-use") {
-        try {
-          await api.post("/users/mark-phone-verified");
-          setIsPhoneVerified(true);
-        } catch {
-          setPhoneOtpError("Failed to record phone verification. Please try again.");
-        }
-      } else if (err.code === "auth/billing-not-enabled") {
-        setPhoneOtpError("Phone verification requires the Firebase Blaze plan. Upgrade at console.firebase.google.com → Spark → Blaze.");
-      } else {
-        setPhoneOtpError(err.message ?? "Failed to send OTP.");
-      }
-      setPhoneOtpStep("idle");
-      if (recaptchaRef.current) { recaptchaRef.current.clear(); recaptchaRef.current = null; }
-    }
-  };
-
-  // ── Confirm phone OTP ────────────────────────────────────────────────────
-  const handleConfirmPhoneOtp = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!confirmationResult) return;
-    setPhoneOtpStep("verifying");
-    setPhoneOtpError(null);
-    try {
-      await confirmationResult.confirm(phoneOtpCode.trim());
-      await api.post("/users/mark-phone-verified");
-      setIsPhoneVerified(true);
-      setPhoneOtpStep("idle");
-      setPhoneOtpCode("");
-    } catch {
-      setPhoneOtpError("Invalid code. Please check and try again.");
-      setPhoneOtpStep("otp");
     }
   };
 
@@ -328,9 +273,6 @@ export function ProfileSettings() {
 
         {/* ── Phone number + verification ───────────────────────────────── */}
         <div className="space-y-2">
-          {/* Hidden reCAPTCHA mount point for phone OTP */}
-          <div id="settings-recaptcha-container" />
-
           <Label htmlFor="phone" className="flex items-center gap-1.5">
             <Phone className="h-3.5 w-3.5" />
             Phone Number
@@ -351,70 +293,10 @@ export function ProfileSettings() {
           />
 
           {/* Verify phone button — shown when phone is saved but not verified */}
-          {phone && isPhoneVerified === false && phoneOtpStep === "idle" && (
-            <div className="space-y-1.5">
-              <Button
-                size="sm"
-                onClick={handleSendPhoneOtp}
-                className="gap-2 font-semibold bg-amber-500 hover:bg-amber-600 text-white border-transparent transition-all"
-              >
-                <ShieldCheck className="h-3.5 w-3.5" />
-                Verify phone number
-              </Button>
-              {phoneOtpError && (
-                <p className="flex items-center gap-1.5 text-xs expense-text">
-                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />{phoneOtpError}
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* Sending OTP spinner */}
-          {phoneOtpStep === "sending" && (
-            <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />Sending verification code…
-            </p>
-          )}
-
-          {/* OTP input form */}
-          {phoneOtpStep === "otp" && (
-            <form onSubmit={handleConfirmPhoneOtp} className="space-y-3 rounded-xl border border-amber-200 bg-amber-50/60 dark:bg-amber-900/10 dark:border-amber-800/40 p-4">
-              <p className="text-sm font-medium text-foreground">
-                Enter the 6-digit code sent to{" "}
-                <span className="font-bold">{phone}</span>
-              </p>
-              <div className="flex gap-2">
-                <Input
-                  type="text"
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  maxLength={6}
-                  value={phoneOtpCode}
-                  onChange={(e) => setPhoneOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                  placeholder="— — — — — —"
-                  className="tracking-[0.5em] text-center font-mono text-lg h-11 border-amber-300 focus-visible:ring-amber-400"
-                />
-                <Button
-                  type="submit"
-                  disabled={phoneOtpCode.length !== 6}
-                  className="shrink-0 h-11 px-5 font-semibold gap-2"
-                >
-                  <ShieldCheck className="h-4 w-4" />
-                  Verify
-                </Button>
-              </div>
-              {phoneOtpError && (
-                <p className="flex items-center gap-1.5 text-xs expense-text">
-                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />{phoneOtpError}
-                </p>
-              )}
-            </form>
-          )}
-
-          {/* Verifying spinner */}
-          {phoneOtpStep === "verifying" && (
-            <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />Verifying code…
+          {phone && isPhoneVerified === false && (
+            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <AlertCircle className="h-3.5 w-3.5 shrink-0 text-amber-500" />
+              Phone verification requires a Firebase Blaze plan upgrade.
             </p>
           )}
 

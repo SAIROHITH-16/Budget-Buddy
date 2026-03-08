@@ -9,11 +9,11 @@
 //   - Shows inline Firebase error messages
 //   - After successful registration, navigates to "/"
 
-import React, { useState, useRef, type FormEvent } from "react";
+import React, { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { type FirebaseError } from "firebase/app";
-import { updateProfile, sendEmailVerification, auth, RecaptchaVerifier, linkWithPhoneNumber, type ConfirmationResult } from "@/firebase";
+import { updateProfile, sendEmailVerification, auth } from "@/firebase";
 import api from "@/api";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -98,13 +98,8 @@ export default function Register() {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isGoogleSubmitting, setIsGoogleSubmitting] = useState<boolean>(false);
 
-  // Phone OTP / email-verify / phone-setup step flow
-  const [step, setStep] = useState<"form" | "phone-otp" | "email-verify" | "phone-setup">("form");
-  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
-  const [phoneOtp, setPhoneOtp] = useState<string>("");
-  const [verifyingPhone, setVerifyingPhone] = useState<boolean>(false);
-  const [phoneVerified, setPhoneVerified] = useState(false);
-  const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
+  // Step flow: form → email-verify (phone OTP disabled — requires Firebase Blaze plan)
+  const [step, setStep] = useState<"form" | "email-verify">("form");
 
   // Resend activation email (from the email-verify step)
   const [resendEmailSending, setResendEmailSending] = useState(false);
@@ -112,17 +107,6 @@ export default function Register() {
   const [resendEmailError,   setResendEmailError]   = useState<string | null>(null);
   // whether the initial activation email send succeeded
   const [initialEmailFailed, setInitialEmailFailed] = useState(false);
-
-  // phone-setup step — add/verify phone after email-verify
-  const [setupCountryCode,  setSetupCountryCode]  = useState<string>("+91");
-  const [setupPhoneInput,   setSetupPhoneInput]   = useState<string>("");
-  const [setupSending,      setSetupSending]      = useState(false);
-  const [setupConfirmation, setSetupConfirmation] = useState<ConfirmationResult | null>(null);
-  const [setupOtpCode,      setSetupOtpCode]      = useState("");
-  const [setupOtpVisible,   setSetupOtpVisible]   = useState(false);
-  const [setupOtpError,     setSetupOtpError]     = useState<string | null>(null);
-  const [setupVerifying,    setSetupVerifying]    = useState(false);
-  const setupRecaptchaRef = useRef<RecaptchaVerifier | null>(null);
 
   // -------------------------------------------------------------------------
   // Client-side validation
@@ -191,26 +175,6 @@ export default function Register() {
         emailSent = false;
       }
 
-      // If phone was entered, verify it via Firebase SMS before proceeding
-      if (phoneNumber.trim()) {
-        try {
-          const verifier = new RecaptchaVerifier(auth, "recaptcha-container", { size: "invisible" });
-          recaptchaVerifierRef.current = verifier;
-          const result = await linkWithPhoneNumber(user, fullPhone, verifier);
-          setConfirmationResult(result);
-          setStep("phone-otp");
-          return;
-        } catch (phoneErr: any) {
-          if (phoneErr.code === "auth/billing-not-enabled") {
-            // Firebase phone SMS requires Blaze plan — skip silently
-            console.warn("Phone auth skipped: Firebase Blaze plan required for SMS.");
-          } else {
-            console.warn("Phone OTP send failed, skipping:", phoneErr);
-          }
-          // Fall through to email-verify
-        }
-      }
-
       // Mark that this is a brand-new registration so the currency
       // setup dialog shows exactly once on the first dashboard visit.
       localStorage.setItem("showCurrencySetup", "true");
@@ -223,45 +187,6 @@ export default function Register() {
     } finally {
       setIsSubmitting(false);
     }
-  }
-
-  // -------------------------------------------------------------------------
-  // Phone OTP verification handler
-  // -------------------------------------------------------------------------
-  async function handleVerifyPhone(e: FormEvent<HTMLFormElement>): Promise<void> {
-    e.preventDefault();
-    if (!confirmationResult) return;
-    setErrorMessage(null);
-    setVerifyingPhone(true);
-    try {
-      await confirmationResult.confirm(phoneOtp.trim());
-
-      // Tell the backend to mark the phone as verified
-      try {
-        await api.post("/users/mark-phone-verified");
-      } catch (backendErr) {
-        console.warn("Backend mark-phone-verified failed:", backendErr);
-      }
-
-      setPhoneVerified(true);
-      localStorage.setItem("showCurrencySetup", "true");
-      // Retry email verification if the initial attempt failed
-      if (initialEmailFailed && auth.currentUser) {
-        sendEmailVerification(auth.currentUser).catch(() => {});
-        setInitialEmailFailed(false);
-      }
-      setStep("email-verify");
-    } catch (err) {
-      setErrorMessage("Invalid code. Please check and try again.");
-    } finally {
-      setVerifyingPhone(false);
-    }
-  }
-
-  // Skip phone verification — still show the email verification prompt
-  function handleSkipPhoneVerification(): void {
-    localStorage.setItem("showCurrencySetup", "true");
-    setStep("email-verify");
   }
 
   // Resend Firebase email verification from the email-verify step
@@ -278,80 +203,6 @@ export default function Register() {
       setResendEmailError(e.message ?? "Failed to resend. Please try again.");
     } finally {
       setResendEmailSending(false);
-    }
-  }
-
-  // Pre-fill phone-setup from form values and navigate to that step
-  function goToPhoneSetup(): void {
-    setSetupCountryCode(countryCode);
-    setSetupPhoneInput(phoneNumber);
-    setSetupOtpVisible(false);
-    setSetupOtpCode("");
-    setSetupOtpError(null);
-    setStep("phone-setup");
-  }
-
-  // Send OTP for the phone entered in the phone-setup step
-  async function handleSetupSendOtp(e: FormEvent<HTMLFormElement>): Promise<void> {
-    e.preventDefault();
-    if (!auth.currentUser) return;
-    const digits = setupPhoneInput.replace(/\D/g, "");
-    const maxLen = phoneMaxLengths[setupCountryCode] ?? 15;
-    if (digits.length !== maxLen) {
-      setSetupOtpError(`Phone number must be exactly ${maxLen} digits for ${setupCountryCode}.`);
-      return;
-    }
-    setSetupSending(true);
-    setSetupOtpError(null);
-    try {
-      if (setupRecaptchaRef.current) { setupRecaptchaRef.current.clear(); setupRecaptchaRef.current = null; }
-      const verifier = new RecaptchaVerifier(auth, "setup-recaptcha-container", { size: "invisible" });
-      setupRecaptchaRef.current = verifier;
-      const fullPhone = `${setupCountryCode}${setupPhoneInput.trim()}`;
-      const result = await linkWithPhoneNumber(auth.currentUser, fullPhone, verifier);
-      setSetupConfirmation(result);
-      setSetupOtpVisible(true);
-    } catch (err: any) {
-      if (err.code === "auth/provider-already-linked" || err.code === "auth/credential-already-in-use") {
-        try { await api.post("/users/mark-phone-verified"); } catch { /* ignore */ }
-        navigate("/dashboard", { replace: true });
-        return;
-      }
-      if (err.code === "auth/billing-not-enabled") {
-        setSetupOtpError("Phone verification requires Firebase Blaze plan. Please upgrade your Firebase project at console.firebase.google.com, or skip for now.");
-      } else {
-        setSetupOtpError(err.message ?? "Failed to send verification code.");
-      }
-      if (setupRecaptchaRef.current) { setupRecaptchaRef.current.clear(); setupRecaptchaRef.current = null; }
-    } finally {
-      setSetupSending(false);
-    }
-  }
-
-  // Confirm OTP for the phone-setup step
-  async function handleSetupConfirmOtp(e: FormEvent<HTMLFormElement>): Promise<void> {
-    e.preventDefault();
-    if (!setupConfirmation) return;
-    setSetupVerifying(true);
-    setSetupOtpError(null);
-    try {
-      await setupConfirmation.confirm(setupOtpCode.trim());
-      const fullPhone = `${setupCountryCode}${setupPhoneInput.trim()}`;
-      // If no phone was in the original form, update the backend profile now
-      if (!phoneNumber.trim()) {
-        await api.post("/users/profile", {
-          firebaseUid: auth.currentUser!.uid,
-          name: auth.currentUser!.displayName ?? "",
-          email: email.trim(),
-          phone: fullPhone,
-        }).catch(() => {});
-      }
-      await api.post("/users/mark-phone-verified");
-      navigate("/dashboard", { replace: true });
-    } catch {
-      setSetupOtpError("Invalid code. Please check and try again.");
-    } finally {
-      setSetupVerifying(false);
     }
   }
 
@@ -390,9 +241,6 @@ export default function Register() {
   // -------------------------------------------------------------------------
   return (
     <div className="flex min-h-screen items-center justify-center bg-transparent px-4">
-      {/* Invisible reCAPTCHA mount point — must always be in the DOM */}
-      <div id="recaptcha-container" />
-
       <div className="w-full max-w-md rounded-2xl p-8" style={{ background: "rgba(255,255,255,0.85)", border: "1px solid rgba(255,255,255,0.95)", boxShadow: "0 4px 16px rgba(124,58,237,0.10), 0 12px 48px rgba(124,58,237,0.08), inset 0 1px 0 rgba(255,255,255,1)", backdropFilter: "blur(20px)" }}>
 
         {/* ================================================================ */}
@@ -463,209 +311,13 @@ export default function Register() {
               <p className="mt-2 text-xs text-destructive text-center">{resendEmailError}</p>
             )}
 
-            {/* Continue — go to phone-setup if phone not yet verified */}
-            <button
-              type="button"
-              onClick={() => phoneVerified ? navigate("/dashboard", { replace: true }) : goToPhoneSetup()}
-              className="mt-4 w-full text-center text-sm text-muted-foreground underline-offset-4 hover:underline"
-            >
-              {phoneVerified ? "Continue to dashboard →" : "Next: verify phone number →"}
-            </button>
-          </>
-        )}
-
-        {/* ================================================================ */}
-        {/* Phone setup step — add + verify phone after email-verify          */}
-        {/* ================================================================ */}
-        {step === "phone-setup" && (
-          <>
-            {/* Hidden reCAPTCHA for phone-setup OTP */}
-            <div id="setup-recaptcha-container" />
-
-            <div className="mb-8 text-center">
-              <div
-                className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full"
-                style={{
-                  background: "linear-gradient(135deg, #0ea5e9, #2563eb)",
-                  boxShadow: "0 4px 20px rgba(37,99,235,0.40), inset 0 1px 0 rgba(255,255,255,0.25)",
-                }}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                </svg>
-              </div>
-              <h1 className="text-2xl font-bold tracking-tight text-foreground">Verify your phone</h1>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {phoneNumber.trim()
-                  ? "Enter the code sent to your phone number"
-                  : "Add a phone number to secure your account"}
-              </p>
-            </div>
-
-            {/* Phase 1: phone input + send code */}
-            {!setupOtpVisible && (
-              <form onSubmit={handleSetupSendOtp} noValidate className="space-y-4">
-                <div className="space-y-1.5">
-                  <label className="block text-sm font-medium text-foreground">Phone Number</label>
-                  <div className="flex gap-2">
-                    <Select value={setupCountryCode} onValueChange={setSetupCountryCode}>
-                      <SelectTrigger className="w-[100px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="+91">🇮🇳 +91</SelectItem>
-                        <SelectItem value="+1">🇺🇸 +1</SelectItem>
-                        <SelectItem value="+44">🇬🇧 +44</SelectItem>
-                        <SelectItem value="+61">🇦🇺 +61</SelectItem>
-                        <SelectItem value="+49">🇩🇪 +49</SelectItem>
-                        <SelectItem value="+81">🇯🇵 +81</SelectItem>
-                        <SelectItem value="+971">🇦🇪 +971</SelectItem>
-                        <SelectItem value="+65">🇸🇬 +65</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <input
-                      type="tel"
-                      inputMode="numeric"
-                      value={setupPhoneInput}
-                      onChange={(e) => setSetupPhoneInput(e.target.value.replace(/\D/g, ""))}
-                      placeholder={phonePlaceholders[setupCountryCode] ?? "Phone number"}
-                      maxLength={phoneMaxLengths[setupCountryCode] ?? 15}
-                      className="flex-1 rounded-lg border border-input bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1"
-                      disabled={setupSending}
-                    />
-                  </div>
-                  {setupOtpError && (
-                    <p className="flex items-center gap-1.5 text-sm text-destructive">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /></svg>
-                      {setupOtpError}
-                    </p>
-                  )}
-                </div>
-                <button
-                  type="submit"
-                  disabled={setupSending || setupPhoneInput.replace(/\D/g, "").length < 7}
-                  className="w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {setupSending ? "Sending code…" : "Send verification code"}
-                </button>
-              </form>
-            )}
-
-            {/* Phase 2: OTP input */}
-            {setupOtpVisible && (
-              <form onSubmit={handleSetupConfirmOtp} noValidate className="space-y-4">
-                <div className="space-y-1.5">
-                  <label className="block text-sm font-medium text-foreground">Verification code</label>
-                  <p className="text-xs text-muted-foreground">
-                    Sent to <span className="font-medium text-foreground">{setupCountryCode} {setupPhoneInput}</span>
-                  </p>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    maxLength={6}
-                    value={setupOtpCode}
-                    onChange={(e) => setSetupOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                    className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-center text-xl tracking-[0.4em] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1"
-                    placeholder="------"
-                    disabled={setupVerifying}
-                  />
-                  {setupOtpError && (
-                    <p className="text-sm text-destructive">{setupOtpError}</p>
-                  )}
-                </div>
-                <button
-                  type="submit"
-                  disabled={setupVerifying || setupOtpCode.length !== 6}
-                  className="w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {setupVerifying ? "Verifying…" : "Verify phone"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setSetupOtpVisible(false); setSetupOtpCode(""); setSetupOtpError(null); }}
-                  className="w-full text-center text-xs text-muted-foreground underline-offset-4 hover:underline"
-                >
-                  Re-enter phone number
-                </button>
-              </form>
-            )}
-
+            {/* Continue to dashboard */}
             <button
               type="button"
               onClick={() => navigate("/dashboard", { replace: true })}
-              className="mt-5 w-full text-center text-sm text-muted-foreground underline-offset-4 hover:underline"
-            >
-              Skip for now
-            </button>
-          </>
-        )}
-
-        {/* ================================================================ */}
-        {/* Phone OTP verification step                                       */}
-        {/* ================================================================ */}
-        {step === "phone-otp" && (
-          <>
-            <div className="mb-8 text-center">
-              <div
-                className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full"
-                style={{
-                  background: "linear-gradient(135deg, #0ea5e9, #2563eb)",
-                  boxShadow: "0 4px 20px rgba(37,99,235,0.40), inset 0 1px 0 rgba(255,255,255,0.25)",
-                }}
-              >
-                {/* Phone / SMS icon */}
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                </svg>
-              </div>
-              <h1 className="text-2xl font-bold tracking-tight text-foreground">Verify your phone</h1>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Enter the 6-digit code sent to{" "}
-                <span className="font-medium text-foreground">{countryCode} {phoneNumber}</span>
-              </p>
-            </div>
-
-            {errorMessage && (
-              <div className="mb-5 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3">
-                <p className="text-sm text-destructive">{errorMessage}</p>
-              </div>
-            )}
-
-            <form onSubmit={handleVerifyPhone} noValidate className="space-y-4">
-              <div className="space-y-1.5">
-                <label htmlFor="phone-otp-input" className="block text-sm font-medium text-foreground">
-                  Verification code
-                </label>
-                <input
-                  id="phone-otp-input"
-                  type="text"
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  maxLength={6}
-                  value={phoneOtp}
-                  onChange={(e) => setPhoneOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                  className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-center text-xl tracking-[0.4em] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1"
-                  placeholder="------"
-                  disabled={verifyingPhone}
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={verifyingPhone || phoneOtp.length !== 6}
-                className="mt-2 w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {verifyingPhone ? "Verifying…" : "Verify phone"}
-              </button>
-            </form>
-
-            <button
-              type="button"
-              onClick={handleSkipPhoneVerification}
               className="mt-4 w-full text-center text-sm text-muted-foreground underline-offset-4 hover:underline"
             >
-              Skip phone verification
+              Continue to dashboard →
             </button>
           </>
         )}
