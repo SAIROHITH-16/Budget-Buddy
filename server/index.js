@@ -13,6 +13,7 @@ const cors    = require("cors");
 require("./firebaseAdmin");
 
 // Route handlers
+const authRoutes        = require("./routes/auth");
 const transactionRoutes = require("./routes/transactions");
 const insightsRoutes    = require("./routes/insights");
 const budgetRoutes      = require("./routes/budget");
@@ -61,6 +62,7 @@ app.use((req, _res, next) => {
 });
 
 // ---- Routes ----
+app.use("/api/auth",         authRoutes);
 app.use("/api/transactions", transactionRoutes);
 app.use("/api/insights",     insightsRoutes);
 app.use("/api/budget",       budgetRoutes);

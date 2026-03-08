@@ -57,19 +57,16 @@ function initSchema(db) {
     );
 
     CREATE TABLE IF NOT EXISTS users (
-      id                  TEXT PRIMARY KEY,
-      firebase_uid        TEXT NOT NULL UNIQUE,
-      name                TEXT NOT NULL,
-      email               TEXT NOT NULL,
-      phone               TEXT,
-      is_verified         INTEGER NOT NULL DEFAULT 0,
-      verify_otp          TEXT,
-      otp_expires         TEXT,
-      is_phone_verified   INTEGER NOT NULL DEFAULT 0,
-      phone_otp           TEXT,
-      phone_otp_expires   TEXT,
-      created_at          TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at          TEXT NOT NULL DEFAULT (datetime('now'))
+      id              TEXT PRIMARY KEY,
+      firebase_uid    TEXT NOT NULL UNIQUE,
+      name            TEXT NOT NULL,
+      email           TEXT NOT NULL,
+      phone           TEXT,
+      is_verified     INTEGER NOT NULL DEFAULT 0,
+      verify_otp      TEXT,
+      otp_expires     TEXT,
+      created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
     );
     CREATE INDEX IF NOT EXISTS users_firebase_uid_idx
       ON users (firebase_uid);
@@ -81,12 +78,10 @@ function initSchema(db) {
 
   // Safe column migrations for databases created before OTP support
   for (const stmt of [
-    "ALTER TABLE users ADD COLUMN is_verified        INTEGER NOT NULL DEFAULT 0",
-    "ALTER TABLE users ADD COLUMN verify_otp         TEXT",
-    "ALTER TABLE users ADD COLUMN otp_expires        TEXT",
-    "ALTER TABLE users ADD COLUMN is_phone_verified  INTEGER NOT NULL DEFAULT 0",
-    "ALTER TABLE users ADD COLUMN phone_otp          TEXT",
-    "ALTER TABLE users ADD COLUMN phone_otp_expires  TEXT",
+    "ALTER TABLE users ADD COLUMN is_verified       INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE users ADD COLUMN verify_otp        TEXT",
+    "ALTER TABLE users ADD COLUMN otp_expires       TEXT",
+    "ALTER TABLE users ADD COLUMN is_phone_verified INTEGER NOT NULL DEFAULT 0",
   ]) {
     try { db.exec(stmt); } catch (_) { /* column already exists */ }
   }

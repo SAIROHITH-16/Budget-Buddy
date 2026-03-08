@@ -1,414 +1,251 @@
 // src/pages/PhoneSignIn.tsx
-// Firebase Phone Authentication — sign in via SMS OTP.
+// Phone.Email OTP sign-in page.
 //
 // Flow:
-//   PHONE_INPUT → user enters phone number with country code → handleSendOtp()
-//                 → invisible reCAPTCHA fires → SMS sent → step switches to OTP_INPUT
+//   1. Renders the Phone.Email "Log in with Phone" button (injected via their script).
+//   2. Phone.Email calls window.phoneEmailListener(token) after the user verifies OTP.
+//   3. We POST the token to our backend at POST /api/auth/verify-phone-email.
+//   4. Backend verifies it, upserts the user in SQLite, and returns a Firebase Custom Token.
+//   5. We call signInWithCustomToken(auth, customToken) — Firebase fires onAuthStateChanged
+//      → AuthContext picks it up → user is now authenticated across the whole app.
+//   6. Navigate to /dashboard.
 //
-//   OTP_INPUT   → user enters 6-digit code → handleVerifyOtp()
-//               → Firebase confirms code → user is authenticated → /dashboard
-//
-// Notes:
-//   • Requires Firebase Blaze (pay-as-you-go) plan — Phone Auth is not available on Spark.
-//   • reCAPTCHA verifier is created once per mount and cleared on unmount / OTP error.
-//   • Phone-auth users bypass the email verification check in ProtectedRoute.
+// Setup:
+//   Add to your .env file:  VITE_PHONE_EMAIL_CLIENT_ID=your-client-id-from-phone.email
 
-import React, { useState, useRef, useEffect, type FormEvent } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { signInWithPhoneNumber, RecaptchaVerifier, type ConfirmationResult } from "firebase/auth";
+import { signInWithCustomToken } from "@/firebase";
 import { auth } from "@/firebase";
 import { useAuth } from "@/context/AuthContext";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import {
-  Phone,
-  KeyRound,
-  ArrowLeft,
-  Loader2,
-  CheckCircle2,
-  AlertCircle,
-  RefreshCw,
-} from "lucide-react";
-import { type FirebaseError } from "firebase/app";
+import api from "@/api";
+import { Loader2, Phone, AlertCircle } from "lucide-react";
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Type declaration for the Phone.Email global callback
 // ---------------------------------------------------------------------------
-function parsePhoneAuthError(error: unknown): string {
-  const e = error as FirebaseError;
-  switch (e?.code) {
-    case "auth/invalid-phone-number":
-      return "Invalid phone number. Include the country code, e.g. +919876543210.";
-    case "auth/missing-phone-number":
-      return "Please enter a phone number.";
-    case "auth/quota-exceeded":
-      return "SMS quota exceeded. Please try again later.";
-    case "auth/user-disabled":
-      return "This account has been disabled.";
-    case "auth/operation-not-allowed":
-      return "Phone authentication is not enabled. Contact support.";
-    case "auth/too-many-requests":
-      return "Too many attempts. Please wait a few minutes before trying again.";
-    case "auth/invalid-verification-code":
-      return "Incorrect code. Please check the SMS and try again.";
-    case "auth/code-expired":
-      return "The verification code has expired. Please request a new one.";
-    case "auth/missing-verification-code":
-      return "Please enter the verification code.";
-    case "auth/captcha-check-failed":
-      return "reCAPTCHA verification failed. Please refresh the page and try again.";
-    default:
-      return e?.message ?? "An unexpected error occurred.";
+declare global {
+  interface Window {
+    phoneEmailListener: (userJson: string | Record<string, unknown>) => void;
   }
 }
 
 // ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-type Step = "PHONE_INPUT" | "OTP_INPUT";
-const RESEND_COOLDOWN_SECONDS = 60;
-
-// ---------------------------------------------------------------------------
-// Component
+// PhoneSignIn Component
 // ---------------------------------------------------------------------------
 export default function PhoneSignIn() {
-  const { currentUser } = useAuth();
-  const navigate = useNavigate();
+  const { currentUser }  = useAuth();
+  const navigate         = useNavigate();
+  const scriptRef        = useRef<HTMLScriptElement | null>(null);
+  const btnContainerRef  = useRef<HTMLDivElement>(null);
 
-  // ── State ────────────────────────────────────────────────────────────────
-  const [step, setStep]                           = useState<Step>("PHONE_INPUT");
-  const [phoneNumber, setPhoneNumber]             = useState("");
-  const [otp, setOtp]                             = useState("");
-  const [error, setError]                         = useState<string | null>(null);
-  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
+  const [status,    setStatus]    = useState<"idle" | "verifying" | "signing-in">("idle");
+  const [errorMsg,  setErrorMsg]  = useState<string | null>(null);
 
-  const [sending, setSending]     = useState(false);
-  const [verifying, setVerifying] = useState(false);
-  const [cooldown, setCooldown]   = useState(0);
-
-  // Holds the RecaptchaVerifier instance across renders — never recreated unless cleared
-  const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
-
-  // ── Redirect already-authenticated users ─────────────────────────────────
+  // ── Redirect if already signed in ─────────────────────────────────────
   useEffect(() => {
-    if (!currentUser) return;
-    const isPhoneUser = currentUser.providerData.some((p) => p.providerId === "phone");
-    if (isPhoneUser || currentUser.emailVerified) {
-      navigate("/dashboard", { replace: true });
-    }
+    if (currentUser) navigate("/dashboard", { replace: true });
   }, [currentUser, navigate]);
 
-  // ── Cooldown countdown ───────────────────────────────────────────────────
-  useEffect(() => {
-    if (cooldown <= 0) return;
-    const id = setTimeout(() => setCooldown((c) => c - 1), 1000);
-    return () => clearTimeout(id);
-  }, [cooldown]);
+  // ── Core: POST token to backend → Firebase custom sign-in ─────────────
+  async function handlePhoneEmailToken(rawToken: string): Promise<void> {
+    setStatus("verifying");
+    setErrorMsg(null);
 
-  // ── Cleanup reCAPTCHA on unmount ─────────────────────────────────────────
+    try {
+      // Step 1 — verify the Phone.Email JWT on our backend
+      const { data } = await api.post<{
+        success: boolean;
+        customToken: string;
+        phone: string;
+        error?: string;
+      }>("/auth/verify-phone-email", { token: rawToken });
+
+      if (!data.success || !data.customToken) {
+        throw new Error(data.error ?? "Backend returned no custom token.");
+      }
+
+      // Step 2 — sign into Firebase with the custom token
+      setStatus("signing-in");
+      await signInWithCustomToken(auth, data.customToken);
+
+      // Step 3 — AuthContext's onAuthStateChanged fires; navigate to dashboard
+      navigate("/dashboard", { replace: true });
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : "Phone sign-in failed. Please try again.";
+      setErrorMsg(msg);
+      setStatus("idle");
+    }
+  }
+
+  // ── Register global callback BEFORE the Phone.Email script loads ───────
   useEffect(() => {
-    return () => {
-      recaptchaVerifierRef.current?.clear();
-      recaptchaVerifierRef.current = null;
+    window.phoneEmailListener = (userJson) => {
+      // Phone.Email passes either the raw JWT string, or an object whose
+      // string form IS the JWT (some SDK versions differ).
+      const token =
+        typeof userJson === "string"
+          ? userJson
+          : (userJson as Record<string, unknown>).token as string | undefined
+            ?? JSON.stringify(userJson);
+
+      if (!token) {
+        setErrorMsg("Phone.Email did not return a valid token. Please try again.");
+        return;
+      }
+
+      handlePhoneEmailToken(token);
     };
+
+    // ── Inject the Phone.Email widget script ───────────────────────────
+    const clientId = import.meta.env.VITE_PHONE_EMAIL_CLIENT_ID as string | undefined;
+    if (!clientId) {
+      console.warn(
+        "[PhoneSignIn] VITE_PHONE_EMAIL_CLIENT_ID is not set. " +
+        "Add it to your .env file to enable phone sign-in."
+      );
+      setErrorMsg("Phone sign-in is not configured. VITE_PHONE_EMAIL_CLIENT_ID is missing.");
+      return;
+    }
+
+    // Set the data-client-id on the button container before loading the script
+    if (btnContainerRef.current) {
+      btnContainerRef.current.setAttribute("data-client-id", clientId);
+    }
+
+    // Only inject the script once
+    if (!document.querySelector('script[src*="phone.email"]')) {
+      const script   = document.createElement("script");
+      script.src     = "https://www.phone.email/sign_in_button_v1.js";
+      script.async   = true;
+      scriptRef.current = script;
+      document.body.appendChild(script);
+    }
+
+    return () => {
+      // Cleanup: remove the script tag on unmount so it doesn't double-load
+      // if the user navigates away and back.
+      if (scriptRef.current && document.body.contains(scriptRef.current)) {
+        document.body.removeChild(scriptRef.current);
+        scriptRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── reCAPTCHA setup — idempotent ─────────────────────────────────────────
-  function setupRecaptcha(): RecaptchaVerifier {
-    if (recaptchaVerifierRef.current) return recaptchaVerifierRef.current;
+  // ── Disable the button container while a verification is in progress ───
+  const isBusy = status !== "idle";
 
-    const verifier = new RecaptchaVerifier(auth, "recaptcha-container", {
-      size: "invisible",
-      callback: () => {
-        // reCAPTCHA solved — signInWithPhoneNumber will call this automatically
-      },
-      "expired-callback": () => {
-        // Token expired; clear so it's recreated on next attempt
-        recaptchaVerifierRef.current?.clear();
-        recaptchaVerifierRef.current = null;
-      },
-    });
+  // ── Status label shown below the button ────────────────────────────────
+  const statusLabel =
+    status === "verifying"   ? "Verifying your phone number…" :
+    status === "signing-in"  ? "Signing you in…"              :
+    null;
 
-    recaptchaVerifierRef.current = verifier;
-    return verifier;
-  }
-
-  // ── Send OTP ─────────────────────────────────────────────────────────────
-  async function handleSendOtp(e: FormEvent<HTMLFormElement>): Promise<void> {
-    e.preventDefault();
-    setError(null);
-
-    const trimmed = phoneNumber.trim();
-    if (!trimmed) {
-      setError("Please enter your phone number.");
-      return;
-    }
-
-    // Ensure E.164 format — prepend + if the user omitted it
-    const formatted = trimmed.startsWith("+") ? trimmed : `+${trimmed}`;
-
-    setSending(true);
-    try {
-      const appVerifier = setupRecaptcha();
-      const result = await signInWithPhoneNumber(auth, formatted, appVerifier);
-      setConfirmationResult(result);
-      setStep("OTP_INPUT");
-      setCooldown(RESEND_COOLDOWN_SECONDS);
-    } catch (err) {
-      // Reset reCAPTCHA so the next attempt can create a fresh one
-      recaptchaVerifierRef.current?.clear();
-      recaptchaVerifierRef.current = null;
-      setError(parsePhoneAuthError(err));
-    } finally {
-      setSending(false);
-    }
-  }
-
-  // ── Verify OTP ───────────────────────────────────────────────────────────
-  async function handleVerifyOtp(e: FormEvent<HTMLFormElement>): Promise<void> {
-    e.preventDefault();
-    if (!confirmationResult) return;
-    setError(null);
-
-    if (!otp.trim()) {
-      setError("Please enter the verification code from the SMS.");
-      return;
-    }
-
-    setVerifying(true);
-    try {
-      await confirmationResult.confirm(otp.trim());
-      // Firebase onAuthStateChanged in AuthContext picks up the new user;
-      // ProtectedRoute lets phone users through without email verification.
-      navigate("/dashboard", { replace: true });
-    } catch (err) {
-      setError(parsePhoneAuthError(err));
-    } finally {
-      setVerifying(false);
-    }
-  }
-
-  // ── Resend OTP ───────────────────────────────────────────────────────────
-  async function handleResend(): Promise<void> {
-    if (cooldown > 0) return;
-    setError(null);
-    setOtp("");
-
-    // Clear existing verifier so Firebase creates a fresh reCAPTCHA token
-    recaptchaVerifierRef.current?.clear();
-    recaptchaVerifierRef.current = null;
-
-    setSending(true);
-    try {
-      const formatted = phoneNumber.trim().startsWith("+")
-        ? phoneNumber.trim()
-        : `+${phoneNumber.trim()}`;
-      const appVerifier = setupRecaptcha();
-      const result = await signInWithPhoneNumber(auth, formatted, appVerifier);
-      setConfirmationResult(result);
-      setCooldown(RESEND_COOLDOWN_SECONDS);
-    } catch (err) {
-      recaptchaVerifierRef.current?.clear();
-      recaptchaVerifierRef.current = null;
-      setError(parsePhoneAuthError(err));
-    } finally {
-      setSending(false);
-    }
-  }
-
-  // ── JSX ──────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      {/*
-        recaptcha-container MUST be in the DOM when RecaptchaVerifier renders.
-        It is invisible — Firebase handles the widget entirely.
-      */}
-      <div id="recaptcha-container" />
-
-      <Card className="glass-card w-full max-w-md shadow-lg">
-        <CardHeader className="text-center space-y-3 pb-4">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-            <Phone className="h-8 w-8 text-primary" />
+    <div
+      className="flex min-h-screen items-center justify-center bg-transparent px-4"
+      style={{
+        backgroundImage: [
+          "radial-gradient(ellipse 80% 50% at 10% 0%, rgba(255,180,120,0.18) 0%, transparent 60%)",
+          "radial-gradient(ellipse 55% 40% at 90% 100%, rgba(165,130,250,0.18) 0%, transparent 55%)",
+        ].join(", "),
+      }}
+    >
+      <div
+        className="w-full max-w-md rounded-2xl p-8"
+        style={{
+          background: "rgba(255,255,255,0.85)",
+          border: "1px solid rgba(255,255,255,0.95)",
+          boxShadow: [
+            "0 4px 16px rgba(124,58,237,0.10)",
+            "0 12px 48px rgba(124,58,237,0.08)",
+            "inset 0 1px 0 rgba(255,255,255,1)",
+          ].join(", "),
+          backdropFilter: "blur(20px)",
+        }}
+      >
+        {/* ── Header ──────────────────────────────────────────────────── */}
+        <div className="mb-8 text-center">
+          <div
+            className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl"
+            style={{
+              background: "linear-gradient(135deg, #7c3aed, #a855f7)",
+              boxShadow:
+                "0 4px 20px rgba(124,58,237,0.40), inset 0 1px 0 rgba(255,255,255,0.25)",
+            }}
+          >
+            <Phone className="h-7 w-7 text-white" />
           </div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">
+            Sign in with Phone
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Enter your phone number to receive a one-time passcode
+          </p>
+        </div>
 
-          {step === "PHONE_INPUT" ? (
-            <>
-              <CardTitle className="text-2xl">Sign in with phone</CardTitle>
-              <CardDescription>
-                Enter your number with the country code (e.g.{" "}
-                <span className="font-mono text-foreground">+919876543210</span>).
-                We'll send a one-time code via SMS.
-              </CardDescription>
-            </>
-          ) : (
-            <>
-              <CardTitle className="text-2xl">Enter verification code</CardTitle>
-              <CardDescription>
-                We sent a 6-digit code to{" "}
-                <span className="font-medium text-foreground">{phoneNumber}</span>.
-                Check your messages.
-              </CardDescription>
-            </>
-          )}
-        </CardHeader>
-
-        <CardContent className="space-y-4">
-          {/* ── STEP 1: Phone number input ─────────────────────────────── */}
-          {step === "PHONE_INPUT" && (
-            <form onSubmit={handleSendOtp} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone number</Label>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="phone"
-                    type="tel"
-                    placeholder="+919876543210"
-                    value={phoneNumber}
-                    onChange={(e) => {
-                      setPhoneNumber(e.target.value);
-                      setError(null);
-                    }}
-                    className="pl-10"
-                    autoComplete="tel"
-                    autoFocus
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Include the country code — e.g. <span className="font-mono">+1</span> for US,{" "}
-                  <span className="font-mono">+91</span> for India.
-                </p>
-              </div>
-
-              {error && (
-                <p className="flex items-start gap-2 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                  {error}
-                </p>
-              )}
-
-              <Button type="submit" className="w-full btn-primary-gradient" disabled={sending}>
-                {sending ? (
-                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Sending code…</>
-                ) : (
-                  <><Phone className="mr-2 h-4 w-4" />Send verification code</>
-                )}
-              </Button>
-            </form>
-          )}
-
-          {/* ── STEP 2: OTP input ─────────────────────────────────────── */}
-          {step === "OTP_INPUT" && (
-            <form onSubmit={handleVerifyOtp} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="otp">6-digit verification code</Label>
-                <div className="relative">
-                  <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="otp"
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    maxLength={6}
-                    placeholder="123456"
-                    value={otp}
-                    onChange={(e) => {
-                      setOtp(e.target.value.replace(/\D/g, ""));
-                      setError(null);
-                    }}
-                    className="pl-10 font-mono tracking-[0.4em] text-center text-lg"
-                    autoComplete="one-time-code"
-                    autoFocus
-                  />
-                </div>
-              </div>
-
-              {error && (
-                <p className="flex items-start gap-2 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                  {error}
-                </p>
-              )}
-
-              <Button
-                type="submit"
-                className="w-full btn-primary-gradient"
-                disabled={verifying || otp.length < 6}
-              >
-                {verifying ? (
-                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Verifying…</>
-                ) : (
-                  <><CheckCircle2 className="mr-2 h-4 w-4" />Verify & sign in</>
-                )}
-              </Button>
-
-              {/* Resend with cooldown */}
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full"
-                onClick={handleResend}
-                disabled={sending || cooldown > 0}
-              >
-                {sending ? (
-                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Sending…</>
-                ) : cooldown > 0 ? (
-                  <><RefreshCw className="mr-2 h-4 w-4" />Resend in {cooldown}s</>
-                ) : (
-                  <><RefreshCw className="mr-2 h-4 w-4" />Resend code</>
-                )}
-              </Button>
-
-              {/* Go back to change number */}
-              <Button
-                type="button"
-                variant="ghost"
-                className="w-full text-muted-foreground"
-                onClick={() => {
-                  setStep("PHONE_INPUT");
-                  setOtp("");
-                  setError(null);
-                  setConfirmationResult(null);
-                  setCooldown(0);
-                }}
-              >
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Use a different number
-              </Button>
-            </form>
-          )}
-
-          {/* ── Divider + other sign-in options ─────────────────────── */}
-          <div className="relative py-1">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-card px-2 text-muted-foreground">or</span>
-            </div>
+        {/* ── Error message ───────────────────────────────────────────── */}
+        {errorMsg && (
+          <div className="mb-5 flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+            <p className="text-sm text-destructive">{errorMsg}</p>
           </div>
+        )}
 
-          <div className="flex flex-col gap-2 text-center text-sm text-muted-foreground">
-            <Link to="/login" className="text-primary hover:underline font-medium">
-              Sign in with email &amp; password
-            </Link>
-            <span>
-              No account?{" "}
-              <Link to="/register" className="text-primary hover:underline font-medium">
-                Register
-              </Link>
-            </span>
+        {/* ── Status indicator while busy ─────────────────────────────── */}
+        {isBusy && (
+          <div className="mb-5 flex items-center justify-center gap-3 rounded-lg bg-primary/8 px-4 py-3">
+            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+            <p className="text-sm font-medium text-primary">{statusLabel}</p>
           </div>
-        </CardContent>
-      </Card>
+        )}
+
+        {/* ── Phone.Email button ──────────────────────────────────────── */}
+        {/* The script targets elements with class="pe_signin_button"      */}
+        {/* and replaces them with the Phone.Email sign-in button widget.  */}
+        <div
+          className={`flex justify-center transition-opacity ${isBusy ? "pointer-events-none opacity-40" : ""}`}
+        >
+          <div
+            ref={btnContainerRef}
+            className="pe_signin_button"
+            // data-client-id is set dynamically in useEffect once env is read
+          />
+        </div>
+
+        {/* ── Divider ─────────────────────────────────────────────────── */}
+        <div className="relative my-6">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-border" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-card px-2 text-muted-foreground">or</span>
+          </div>
+        </div>
+
+        {/* ── Links ───────────────────────────────────────────────────── */}
+        <p className="text-center text-sm text-muted-foreground">
+          <Link
+            to="/login"
+            className="font-medium text-primary underline-offset-4 hover:underline"
+          >
+            Sign in with email instead
+          </Link>
+        </p>
+        <p className="mt-3 text-center text-sm text-muted-foreground">
+          Don&apos;t have an account?{" "}
+          <Link
+            to="/register"
+            className="font-medium text-primary underline-offset-4 hover:underline"
+          >
+            Create one
+          </Link>
+        </p>
+      </div>
     </div>
   );
 }
