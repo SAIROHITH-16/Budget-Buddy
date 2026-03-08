@@ -14,6 +14,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { type FirebaseError } from "firebase/app";
 import { updateProfile } from "@/firebase";
+import { sendEmailVerification } from "firebase/auth";
 import api from "@/api";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -160,7 +161,15 @@ export default function Register() {
       // Mark that this is a brand-new registration so the currency
       // setup dialog shows exactly once on the first dashboard visit.
       localStorage.setItem("showCurrencySetup", "true");
-      navigate("/dashboard", { replace: true });
+
+      // Step E: Send Firebase email verification (non-fatal if it fails)
+      try {
+        await sendEmailVerification(user);
+      } catch {
+        // User can resend from the verify-email page
+      }
+
+      navigate("/verify-email", { replace: true });
     } catch (err) {
       setErrorMessage(parseFirebaseError(err));
     } finally {

@@ -46,7 +46,14 @@ export function ProtectedRoute({ redirectTo = "/login" }: ProtectedRouteProps) {
     );
   }
 
-  // User is authenticated — render the nested <Route> children
+  // User is authenticated but email unverified — block access to private routes.
+  // Google OAuth users always have emailVerified === true, so this only gates
+  // email+password accounts that haven't clicked their verification link yet.
+  if (currentUser !== null && !currentUser.emailVerified) {
+    return <Navigate to="/verify-email" replace />;
+  }
+
+  // User is authenticated and verified — render the nested <Route> children
   if (currentUser !== null) {
     return <Outlet />;
   }
