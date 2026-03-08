@@ -42,8 +42,10 @@ export default function PhoneSignIn() {
       setSuccessMsg("OTP sent! Check your messages.");
       setStep("OTP_INPUT");
     } catch (err: unknown) {
+      // Extract the backend error message from the axios response body if present
+      const axiosBody = (err as { response?: { data?: { error?: string } } })?.response?.data;
       setErrorMsg(
-        err instanceof Error ? err.message : "Could not send OTP. Please try again."
+        axiosBody?.error ?? (err instanceof Error ? err.message : "Could not send OTP. Please try again.")
       );
     } finally {
       setLoading(false);

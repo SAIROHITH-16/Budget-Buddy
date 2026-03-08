@@ -244,29 +244,41 @@ router.post("/send-otp", async (req, res) => {
        ON CONFLICT(phone) DO UPDATE SET otp = excluded.otp, expires_at = excluded.expires_at, created_at = datetime('now')`
     ).run(e164, otp, expiresAt);
 
-    // Send OTP via Fast2SMS Bulk API
-    const smsResp = await fetch("https://www.fast2sms.com/dev/bulkV2", {
-      method: "POST",
-      headers: {
-        authorization: apiKey,
-        "Content-Type": "application/json",
-        "cache-control": "no-cache",
-      },
-      body: JSON.stringify({
-        route:            "otp",
-        variables_values: otp,
-        numbers:          localNumber,
-        flash:            0,
-      }),
-    });
-
-    const smsData = await smsResp.json();
-    if (!smsResp.ok || smsData.return === false) {
-      console.error("[auth] Fast2SMS error:", smsData);
+    // Send OTP via Fast2SMS quick route ('q') — no DLT template required
+    const axios   = require("axios");
+    let smsData;
+    try {
+      const smsResp = await axios.post(
+        "https://www.fast2sms.com/dev/bulkV2",
+        {
+          route:    "q",
+          message:  `Your Budget Buddy OTP is ${otp}. It is valid for 10 minutes. Do not share it with anyone.`,
+          language: "english",
+          numbers:  localNumber,
+          flash:    0,
+        },
+        {
+          headers: {
+            authorization:   apiKey,
+            "cache-control": "no-cache",
+          },
+        }
+      );
+      smsData = smsResp.data;
+    } catch (smsErr) {
+      const detail = smsErr?.response?.data?.message ?? smsErr.message;
+      console.error("[auth] Fast2SMS send-otp error:", detail);
       return res.status(502).json({
         success: false,
-        error:   "Failed to send OTP. Please try again.",
-        details: smsData.message || smsData,
+        error:   `SMS delivery failed: ${detail}`,
+      });
+    }
+
+    if (!smsData || smsData.return === false) {
+      console.error("[auth] Fast2SMS rejected OTP send:", smsData);
+      return res.status(502).json({
+        success: false,
+        error:   `SMS delivery failed: ${Array.isArray(smsData?.message) ? smsData.message.join(", ") : smsData?.message ?? "Unknown Fast2SMS error"}`,
       });
     }
 
