@@ -1,192 +1,229 @@
-// src/pages/PhoneSignIn.tsx
-// Phone.Email OTP sign-in page.
+﻿// src/pages/PhoneSignIn.tsx
+// Native two-step SMS OTP sign-in.
 //
-// Flow:
-//   1. Renders the Phone.Email "Log in with Phone" button (injected via their script).
-//   2. Phone.Email calls window.phoneEmailListener(token) after the user verifies OTP.
-//   3. We POST the token to our backend at POST /api/auth/verify-phone-email.
-//   4. Backend verifies it, upserts the user in SQLite, and returns a Firebase Custom Token.
-//   5. We call signInWithCustomToken(auth, customToken) — Firebase fires onAuthStateChanged
-//      → AuthContext picks it up → user is now authenticated across the whole app.
-//   6. Navigate to /dashboard.
-//
-// Setup:
-//   Add to your .env file:  VITE_PHONE_EMAIL_CLIENT_ID=your-client-id-from-phone.email
+// Step 1 â€” PHONE_INPUT: user enters their mobile number â†’ POST /api/auth/send-otp
+// Step 2 â€” OTP_INPUT:   user enters the 6-digit code   â†’ POST /api/auth/verify-otp
+//           On success, calls signInWithCustomToken() and navigates to /dashboard.
 
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { signInWithCustomToken } from "@/firebase";
-import { auth } from "@/firebase";
-import { useAuth } from "@/context/AuthContext";
+import { signInWithCustomToken, auth } from "@/firebase";
 import api from "@/api";
-import { Loader2, Phone, AlertCircle } from "lucide-react";
+import { Loader2, Phone, ShieldCheck, AlertCircle, ArrowLeft } from "lucide-react";
 
-// ---------------------------------------------------------------------------
-// Type declaration for the Phone.Email global callback
-// ---------------------------------------------------------------------------
-declare global {
-  interface Window {
-    phoneEmailListener: (userObj: { user_json_url: string }) => void;
-    log_in_with_phone: (cfg: string) => void;
-  }
-}
+type Step = "PHONE_INPUT" | "OTP_INPUT";
 
-// ---------------------------------------------------------------------------
-// PhoneSignIn Component
-// ---------------------------------------------------------------------------
 export default function PhoneSignIn() {
-  const { currentUser }  = useAuth();
-  const navigate         = useNavigate();
+  const navigate = useNavigate();
 
-  const [status,   setStatus]   = useState<"idle" | "verifying" | "signing-in">("idle");
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [step,        setStep]        = useState<Step>("PHONE_INPUT");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [otp,         setOtp]         = useState("");
+  const [loading,     setLoading]     = useState(false);
+  const [errorMsg,    setErrorMsg]    = useState<string | null>(null);
+  const [successMsg,  setSuccessMsg]  = useState<string | null>(null);
 
-  // ── Redirect if already signed in ─────────────────────────────────────
-  useEffect(() => {
-    if (currentUser) navigate("/dashboard", { replace: true });
-  }, [currentUser, navigate]);
-
-  // ── Core: POST token to backend → Firebase custom sign-in ─────────────
-  async function handlePhoneEmailToken(rawToken: string): Promise<void> {
-    setStatus("verifying");
+  // â”€â”€ Step 1: send OTP â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  async function handleSendOtp(e: React.FormEvent) {
+    e.preventDefault();
     setErrorMsg(null);
+    setSuccessMsg(null);
 
-    try {
-      // Step 1 — verify the Phone.Email JWT on our backend
-      const { data } = await api.post<{
-        success: boolean;
-        customToken: string;
-        phone: string;
-        error?: string;
-      }>("/auth/verify-phone-email", { token: rawToken });
-
-      if (!data.success || !data.customToken) {
-        throw new Error(data.error ?? "Backend returned no custom token.");
-      }
-
-      // Step 2 — sign into Firebase with the custom token
-      setStatus("signing-in");
-      await signInWithCustomToken(auth, data.customToken);
-
-      // Step 3 — AuthContext's onAuthStateChanged fires; navigate to dashboard
-      navigate("/dashboard", { replace: true });
-    } catch (err: unknown) {
-      const msg =
-        err instanceof Error
-          ? err.message
-          : "Phone sign-in failed. Please try again.";
-      setErrorMsg(msg);
-      setStatus("idle");
-    }
-  }
-
-  // ── Register global callback BEFORE the Phone.Email script loads ───────
-  useEffect(() => {
-    // Define listener first so it is ready the moment the widget fires it
-    window.phoneEmailListener = (userObj) => {
-      handlePhoneEmailToken(userObj.user_json_url);
-    };
-
-    const clientId = import.meta.env.VITE_PHONE_EMAIL_CLIENT_ID as string | undefined;
-    if (!clientId) {
-      setErrorMsg("Phone sign-in is not configured. VITE_PHONE_EMAIL_CLIENT_ID is missing.");
+    const digits = phoneNumber.replace(/\D/g, "");
+    if (digits.length < 10) {
+      setErrorMsg("Enter a valid 10-digit mobile number.");
       return;
     }
 
-    const script = document.createElement("script");
-    script.src   = "https://auth.phone.email/login_automated_v1_2.js";
-    script.async = true;
-    script.onload = () => {
-      if (typeof window.log_in_with_phone === "function") {
-        window.log_in_with_phone(JSON.stringify({ client_id: clientId, success_url: "" }));
+    setLoading(true);
+    try {
+      const { data } = await api.post("/auth/send-otp", { phoneNumber: digits });
+      if (!data.success) throw new Error(data.error ?? "Failed to send OTP.");
+      setSuccessMsg("OTP sent! Check your messages.");
+      setStep("OTP_INPUT");
+    } catch (err: unknown) {
+      setErrorMsg(
+        err instanceof Error ? err.message : "Could not send OTP. Please try again."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // â”€â”€ Step 2: verify OTP â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  async function handleVerifyOtp(e: React.FormEvent) {
+    e.preventDefault();
+    setErrorMsg(null);
+
+    if (!/^\d{6}$/.test(otp)) {
+      setErrorMsg("OTP must be exactly 6 digits.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { data } = await api.post("/auth/verify-otp", {
+        phoneNumber: phoneNumber.replace(/\D/g, ""),
+        otp,
+      });
+      if (!data.success || !data.customToken) {
+        throw new Error(data.error ?? "Verification failed.");
       }
-    };
-    document.body.appendChild(script);
+      await signInWithCustomToken(auth, data.customToken);
+      navigate("/dashboard", { replace: true });
+    } catch (err: unknown) {
+      setErrorMsg(
+        err instanceof Error ? err.message : "Verification failed. Please try again."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
 
-    return () => {
-      if (document.body.contains(script)) document.body.removeChild(script);
-      delete (window as unknown as Record<string, unknown>).phoneEmailListener;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // ── Disable the button container while a verification is in progress ───
-  const isBusy = status !== "idle";
-
-  // ── Status label shown below the button ────────────────────────────────
-  const statusLabel =
-    status === "verifying"   ? "Verifying your phone number…" :
-    status === "signing-in"  ? "Signing you in…"              :
-    null;
-
+  // â”€â”€ Shared card wrapper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   return (
-    <div
-      className="flex min-h-screen items-center justify-center bg-transparent px-4"
-      style={{
-        backgroundImage: [
-          "radial-gradient(ellipse 80% 50% at 10% 0%, rgba(255,180,120,0.18) 0%, transparent 60%)",
-          "radial-gradient(ellipse 55% 40% at 90% 100%, rgba(165,130,250,0.18) 0%, transparent 55%)",
-        ].join(", "),
-      }}
-    >
+    <div className="flex min-h-screen items-center justify-center bg-transparent px-4">
       <div
         className="w-full max-w-md rounded-2xl p-8"
         style={{
-          background: "rgba(255,255,255,0.85)",
-          border: "1px solid rgba(255,255,255,0.95)",
-          boxShadow: [
-            "0 4px 16px rgba(124,58,237,0.10)",
-            "0 12px 48px rgba(124,58,237,0.08)",
-            "inset 0 1px 0 rgba(255,255,255,1)",
-          ].join(", "),
+          background:    "rgba(255,255,255,0.85)",
+          border:        "1px solid rgba(255,255,255,0.95)",
+          boxShadow:     "0 4px 16px rgba(124,58,237,0.10), 0 12px 48px rgba(124,58,237,0.08), inset 0 1px 0 rgba(255,255,255,1)",
           backdropFilter: "blur(20px)",
         }}
       >
-        {/* ── Header ──────────────────────────────────────────────────── */}
+        {/* â”€â”€ Header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         <div className="mb-8 text-center">
           <div
             className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl"
             style={{
               background: "linear-gradient(135deg, #7c3aed, #a855f7)",
-              boxShadow:
-                "0 4px 20px rgba(124,58,237,0.40), inset 0 1px 0 rgba(255,255,255,0.25)",
+              boxShadow:  "0 4px 20px rgba(124,58,237,0.40), inset 0 1px 0 rgba(255,255,255,0.25)",
             }}
           >
-            <Phone className="h-7 w-7 text-white" />
+            {step === "OTP_INPUT"
+              ? <ShieldCheck className="h-7 w-7 text-white" />
+              : <Phone       className="h-7 w-7 text-white" />}
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">
-            Sign in with Phone
+            {step === "OTP_INPUT" ? "Enter your OTP" : "Sign in with Phone"}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Enter your phone number to receive a one-time passcode
+            {step === "OTP_INPUT"
+              ? `We sent a 6-digit code to +91 ${phoneNumber}`
+              : "Get a one-time SMS code to your mobile number"}
           </p>
         </div>
 
-        {/* ── Error message ───────────────────────────────────────────── */}
+        {/* â”€â”€ Error / success banners â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         {errorMsg && (
           <div className="mb-5 flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
             <p className="text-sm text-destructive">{errorMsg}</p>
           </div>
         )}
-
-        {/* ── Status indicator while busy ─────────────────────────────── */}
-        {isBusy && (
-          <div className="mb-5 flex items-center justify-center gap-3 rounded-lg bg-primary/8 px-4 py-3">
-            <Loader2 className="h-4 w-4 animate-spin text-primary" />
-            <p className="text-sm font-medium text-primary">{statusLabel}</p>
+        {successMsg && !errorMsg && (
+          <div className="mb-5 rounded-lg border border-green-300 bg-green-50 px-4 py-3">
+            <p className="text-sm text-green-700">{successMsg}</p>
           </div>
         )}
 
-        {/* ── Phone.Email button ──────────────────────────────────────── */}
-        {/* Phone.Email injects its widget into #pheIncludedContent       */}
-        <div
-          className={`flex justify-center transition-opacity ${isBusy ? "pointer-events-none opacity-40" : ""}`}
-        >
-          <div id="pheIncludedContent" />
-        </div>
+        {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+        {/* Step 1 â€” Phone number input                                       */}
+        {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+        {step === "PHONE_INPUT" && (
+          <form onSubmit={handleSendOtp} noValidate className="space-y-4">
+            <div className="space-y-1.5">
+              <label htmlFor="phone-input" className="block text-sm font-medium text-foreground">
+                Mobile number
+              </label>
+              <div className="flex">
+                {/* Country code badge */}
+                <span className="inline-flex items-center rounded-l-lg border border-r-0 border-input bg-muted px-3 text-sm text-muted-foreground select-none">
+                  +91
+                </span>
+                <input
+                  id="phone-input"
+                  type="tel"
+                  inputMode="numeric"
+                  autoComplete="tel"
+                  maxLength={10}
+                  required
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                  className="flex-1 rounded-r-lg border border-input bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 disabled:opacity-50"
+                  placeholder="9876543210"
+                  disabled={loading}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">10-digit Indian mobile number</p>
+            </div>
 
-        {/* ── Divider ─────────────────────────────────────────────────── */}
+            <button
+              type="submit"
+              disabled={loading || phoneNumber.replace(/\D/g, "").length < 10}
+              className="mt-2 w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Sendingâ€¦</> : "Send OTP"}
+            </button>
+          </form>
+        )}
+
+        {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+        {/* Step 2 â€” OTP input                                                */}
+        {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+        {step === "OTP_INPUT" && (
+          <form onSubmit={handleVerifyOtp} noValidate className="space-y-4">
+            <div className="space-y-1.5">
+              <label htmlFor="otp-input" className="block text-sm font-medium text-foreground">
+                6-digit code
+              </label>
+              <input
+                id="otp-input"
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                maxLength={6}
+                required
+                autoFocus
+                value={otp}
+                onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-center text-xl tracking-[0.5em] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 disabled:opacity-50"
+                placeholder="Â·Â·Â·Â·Â·Â·"
+                disabled={loading}
+              />
+              <p className="text-xs text-muted-foreground">
+                Didn't receive it?{" "}
+                <button
+                  type="button"
+                  onClick={() => { setStep("PHONE_INPUT"); setOtp(""); setErrorMsg(null); setSuccessMsg(null); }}
+                  className="text-primary underline-offset-4 hover:underline"
+                >
+                  Resend OTP
+                </button>
+              </p>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading || otp.length < 6}
+              className="mt-2 w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Verifyingâ€¦</> : "Verify OTP"}
+            </button>
+
+            {/* Back button */}
+            <button
+              type="button"
+              onClick={() => { setStep("PHONE_INPUT"); setOtp(""); setErrorMsg(null); }}
+              className="flex w-full items-center justify-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" /> Change phone number
+            </button>
+          </form>
+        )}
+
+        {/* â”€â”€ Footer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         <div className="relative my-6">
           <div className="absolute inset-0 flex items-center">
             <div className="w-full border-t border-border" />
@@ -195,22 +232,14 @@ export default function PhoneSignIn() {
             <span className="bg-card px-2 text-muted-foreground">or</span>
           </div>
         </div>
-
-        {/* ── Links ───────────────────────────────────────────────────── */}
         <p className="text-center text-sm text-muted-foreground">
-          <Link
-            to="/login"
-            className="font-medium text-primary underline-offset-4 hover:underline"
-          >
+          <Link to="/login" className="font-medium text-primary underline-offset-4 hover:underline">
             Sign in with email instead
           </Link>
         </p>
         <p className="mt-3 text-center text-sm text-muted-foreground">
           Don&apos;t have an account?{" "}
-          <Link
-            to="/register"
-            className="font-medium text-primary underline-offset-4 hover:underline"
-          >
+          <Link to="/register" className="font-medium text-primary underline-offset-4 hover:underline">
             Create one
           </Link>
         </p>
