@@ -9,11 +9,11 @@
 //   - Shows inline Firebase error messages
 //   - After successful registration, navigates to "/"
 
-import React, { useState, type FormEvent } from "react";
+import React, { useState, useEffect, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { type FirebaseError } from "firebase/app";
-import { updateProfile } from "@/firebase";
+import { updateProfile, signInWithCustomToken, auth } from "@/firebase";
 import { sendEmailVerification } from "firebase/auth";
 import api from "@/api";
 import { useToast } from "@/hooks/use-toast";
@@ -98,8 +98,60 @@ export default function Register() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isGoogleSubmitting, setIsGoogleSubmitting] = useState<boolean>(false);
+  const [isPhoneSubmitting, setIsPhoneSubmitting] = useState<boolean>(false);
 
+  // -------------------------------------------------------------------------
+  // Phone.Email handler — called by the global listener once the user verifies
+  // -------------------------------------------------------------------------
+  async function handlePhoneEmailToken(userJsonUrl: string): Promise<void> {
+    setIsPhoneSubmitting(true);
+    setErrorMessage(null);
+    try {
+      const { data } = await api.post("/auth/verify-phone-email", { token: userJsonUrl });
+      await signInWithCustomToken(auth, data.customToken);
+      localStorage.setItem("showCurrencySetup", "true");
+      navigate("/dashboard", { replace: true });
+    } catch {
+      setErrorMessage("Phone verification failed. Please try again.");
+    } finally {
+      setIsPhoneSubmitting(false);
+    }
+  }
 
+  // -------------------------------------------------------------------------
+  // Phone.Email script injection
+  // -------------------------------------------------------------------------
+  useEffect(() => {
+    // Define the global listener BEFORE the script is injected so it is
+    // available the moment the widget calls it on successful OTP verification.
+    (window as unknown as Record<string, unknown>).phoneEmailListener = (
+      userObj: { user_json_url: string }
+    ) => {
+      handlePhoneEmailToken(userObj.user_json_url);
+    };
+
+    const script = document.createElement("script");
+    script.src = "https://auth.phone.email/login_automated_v1_2.js";
+    script.async = true;
+    script.onload = () => {
+      const logInWithPhone = (
+        window as unknown as Record<string, (cfg: { client_id: string; success_url: string }) => void>
+      ).log_in_with_phone;
+      if (typeof logInWithPhone === "function") {
+        logInWithPhone({
+          client_id: import.meta.env.VITE_PHONE_EMAIL_CLIENT_ID as string,
+          success_url: "",
+        });
+      }
+    };
+    document.body.appendChild(script);
+
+    return () => {
+      if (document.body.contains(script)) document.body.removeChild(script);
+      delete (window as unknown as Record<string, unknown>).phoneEmailListener;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // -------------------------------------------------------------------------
   // Client-side validation
@@ -454,6 +506,16 @@ export default function Register() {
           </svg>
           {isGoogleSubmitting ? "Signing up…" : "Continue with Google"}
         </button>
+
+        {/* ---------------------------------------------------------------- */}
+        {/* Phone.Email sign-up widget                                       */}
+        {/* ---------------------------------------------------------------- */}
+        <div className="mt-2 flex flex-col items-center">
+          <div id="pheIncludedContent" />
+          {isPhoneSubmitting && (
+            <p className="mt-2 text-xs text-muted-foreground">Verifying phone…</p>
+          )}
+        </div>
 
         {/* ---------------------------------------------------------------- */}
         {/* Footer — link to login                                           */}
