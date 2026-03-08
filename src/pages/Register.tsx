@@ -135,13 +135,13 @@ export default function Register() {
     script.async = true;
     script.onload = () => {
       const logInWithPhone = (
-        window as unknown as Record<string, (cfg: { client_id: string; success_url: string }) => void>
+        window as unknown as Record<string, (cfg: string) => void>
       ).log_in_with_phone;
       if (typeof logInWithPhone === "function") {
-        logInWithPhone({
+        logInWithPhone(JSON.stringify({
           client_id: import.meta.env.VITE_PHONE_EMAIL_CLIENT_ID as string,
           success_url: "",
-        });
+        }));
       }
     };
     document.body.appendChild(script);

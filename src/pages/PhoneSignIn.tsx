@@ -27,7 +27,7 @@ import { Loader2, Phone, AlertCircle } from "lucide-react";
 declare global {
   interface Window {
     phoneEmailListener: (userObj: { user_json_url: string }) => void;
-    log_in_with_phone: (cfg: { client_id: string; success_url: string }) => void;
+    log_in_with_phone: (cfg: string) => void;
   }
 }
 
@@ -98,7 +98,7 @@ export default function PhoneSignIn() {
     script.async = true;
     script.onload = () => {
       if (typeof window.log_in_with_phone === "function") {
-        window.log_in_with_phone({ client_id: clientId, success_url: "" });
+        window.log_in_with_phone(JSON.stringify({ client_id: clientId, success_url: "" }));
       }
     };
     document.body.appendChild(script);
