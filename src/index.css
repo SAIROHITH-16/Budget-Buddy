@@ -158,7 +158,7 @@
   }
 
   .dark body {
-    background: linear-gradient(135deg, #1e0a3c 0%, #150d2e 50%, #0e1337 100%);
+    background: linear-gradient(135deg, #ffecd2 0%, #e8d5fb 50%, #c3dafe 100%);
     background-attachment: fixed;
   }
 
