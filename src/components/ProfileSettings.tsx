@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { updateProfile, sendPasswordResetEmail, sendEmailVerification, reload } from "firebase/auth";
-import { User, Mail, KeyRound, Loader2, Save, CheckCircle2, AlertCircle, Phone, ShieldCheck, ShieldAlert, RefreshCw } from "lucide-react";
+import { updateProfile, sendPasswordResetEmail } from "firebase/auth";
+import { User, Mail, KeyRound, Loader2, Save, CheckCircle2, AlertCircle, Phone } from "lucide-react";
 import { auth } from "@/firebase";
 import { useAuth } from "@/context/AuthContext";
 import api from "@/api";
@@ -9,7 +9,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -45,32 +44,17 @@ export function ProfileSettings() {
   const [resetSent,    setResetSent]    = useState(false);
   const [resetError,   setResetError]   = useState<string | null>(null);
 
-  // ── Phone number + verification state (fetched from backend profile) ──────
-  const [phone,           setPhone]           = useState<string | null>(null);
-  const [isPhoneVerified, setIsPhoneVerified] = useState<boolean | null>(null);
-  // isEmailVerified is derived below from currentUser.emailVerified (not from state)
-
-  // ── Resend activation email state ─────────────────────────────────────────
-  const [resendSending, setResendSending] = useState(false);
-  const [resendSent,    setResendSent]    = useState(false);
-  const [resendError,   setResendError]   = useState<string | null>(null);
+  // ── Phone number (fetched from backend profile) ────────────────────────────
+  const [phone, setPhone] = useState<string | null>(null);
 
   useEffect(() => {
-    // Reload the Firebase user to get the freshest emailVerified flag
-    if (auth.currentUser) {
-      reload(auth.currentUser).catch(() => {});
-    }
     api.get("/users/profile")
       .then((res) => {
         const data = res.data?.data;
         setPhone(data?.phone ?? null);
-        setIsPhoneVerified(data?.isPhoneVerified ?? false);
       })
       .catch(() => setPhone(null));
   }, [currentUser?.uid]);
-
-  // Derive email verified directly from Firebase (live, same as password reset flow)
-  const isEmailVerified = currentUser?.emailVerified ?? false;
 
   const email    = currentUser?.email ?? "";
   const initials = getInitials(currentUser?.displayName ?? null, email);
@@ -102,22 +86,6 @@ export function ProfileSettings() {
     }
   };
 
-  // ── Resend Firebase email verification (same as password reset — no SMTP needed) ──
-  const handleResendActivationEmail = async () => {
-    if (!auth.currentUser) return;
-    setResendSending(true);
-    setResendError(null);
-    setResendSent(false);
-    try {
-      await sendEmailVerification(auth.currentUser);
-      setResendSent(true);
-      setTimeout(() => setResendSent(false), 8000);
-    } catch (e: any) {
-      setResendError(e.message ?? "Failed to send verification email.");
-    } finally {
-      setResendSending(false);
-    }
-  };
 
   // ── Send password reset email ────────────────────────────────────────────
   const handleResetPassword = async () => {
@@ -222,11 +190,6 @@ export function ProfileSettings() {
           <Label htmlFor="email" className="flex items-center gap-1.5">
             <Mail className="h-3.5 w-3.5" />
             Email
-            {isPasswordProvider && isEmailVerified !== null && (
-              isEmailVerified
-                ? <Badge variant="secondary" className="ml-1 gap-1 text-green-700 bg-green-100 border-green-200"><ShieldCheck className="h-3 w-3" />Verified</Badge>
-                : <Badge variant="secondary" className="ml-1 gap-1 text-amber-700 bg-amber-100 border-amber-200"><ShieldAlert className="h-3 w-3" />Unverified</Badge>
-            )}
           </Label>
           <Input
             id="email"
@@ -236,39 +199,7 @@ export function ProfileSettings() {
             disabled
             className="opacity-70 cursor-not-allowed"
           />
-          {/* Resend activation link — only for email/password + unverified */}
-          {isPasswordProvider && isEmailVerified === false && (
-            <div className="space-y-1.5">
-              <Button
-                size="sm"
-                onClick={handleResendActivationEmail}
-                disabled={resendSending || resendSent}
-                className={`gap-2 font-semibold transition-all ${
-                  resendSent
-                    ? "bg-green-600 hover:bg-green-600 text-white border-green-600"
-                    : "bg-amber-500 hover:bg-amber-600 text-white border-transparent"
-                }`}
-              >
-                {resendSending
-                  ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Sending…</>
-                  : resendSent
-                  ? <><CheckCircle2 className="h-3.5 w-3.5" />Email sent!</>
-                  : <><RefreshCw className="h-3.5 w-3.5" />Resend activation email</>}
-              </Button>
-              {resendSent && <p className="text-xs text-muted-foreground">Check your inbox — the link expires in 24 hours.</p>}
-              {resendError && <p className="flex items-center gap-1.5 text-xs expense-text"><AlertCircle className="h-3.5 w-3.5 shrink-0" />{resendError}</p>}
-            </div>
-          )}
-          {(!isPasswordProvider) && (
-            <p className="text-xs text-muted-foreground">
-              Email address cannot be changed here.
-            </p>
-          )}
-          {isPasswordProvider && isEmailVerified && (
-            <p className="text-xs text-muted-foreground">
-              Email address cannot be changed here.
-            </p>
-          )}
+          <p className="text-xs text-muted-foreground">Email address cannot be changed here.</p>
         </div>
 
         {/* ── Phone number + verification ───────────────────────────────── */}
@@ -276,11 +207,6 @@ export function ProfileSettings() {
           <Label htmlFor="phone" className="flex items-center gap-1.5">
             <Phone className="h-3.5 w-3.5" />
             Phone Number
-            {isPhoneVerified !== null && phone && (
-              isPhoneVerified
-                ? <Badge variant="secondary" className="ml-1 gap-1 text-green-700 bg-green-100 border-green-200"><ShieldCheck className="h-3 w-3" />Verified</Badge>
-                : <Badge variant="secondary" className="ml-1 gap-1 text-amber-700 bg-amber-100 border-amber-200"><ShieldAlert className="h-3 w-3" />Unverified</Badge>
-            )}
           </Label>
           <Input
             id="phone"
@@ -291,26 +217,6 @@ export function ProfileSettings() {
             placeholder={phone === null ? "Not set" : undefined}
             className="opacity-70 cursor-not-allowed"
           />
-
-          {/* Verify phone button — shown when phone is saved but not verified */}
-          {phone && isPhoneVerified === false && (
-            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <AlertCircle className="h-3.5 w-3.5 shrink-0 text-amber-500" />
-              Phone verification requires a Firebase Blaze plan upgrade.
-            </p>
-          )}
-
-          {/* Success */}
-          {isPhoneVerified && (
-            <p className="text-xs text-muted-foreground">
-              Phone number verified.
-            </p>
-          )}
-          {!phone && (
-            <p className="text-xs text-muted-foreground">
-              No phone number saved. You can add one by re-registering or updating your profile.
-            </p>
-          )}
         </div>
 
         {/* ── Password reset (only for email/password accounts) ─────────── */}

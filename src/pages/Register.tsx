@@ -13,7 +13,7 @@ import React, { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { type FirebaseError } from "firebase/app";
-import { updateProfile, sendEmailVerification, auth } from "@/firebase";
+import { updateProfile } from "@/firebase";
 import api from "@/api";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -98,16 +98,6 @@ export default function Register() {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isGoogleSubmitting, setIsGoogleSubmitting] = useState<boolean>(false);
 
-  // Step flow: form → email-verify (phone OTP disabled — requires Firebase Blaze plan)
-  const [step, setStep] = useState<"form" | "email-verify">("form");
-
-  // Resend activation email (from the email-verify step)
-  const [resendEmailSending, setResendEmailSending] = useState(false);
-  const [resendEmailSent,    setResendEmailSent]    = useState(false);
-  const [resendEmailError,   setResendEmailError]   = useState<string | null>(null);
-  // whether the initial activation email send succeeded
-  const [initialEmailFailed, setInitialEmailFailed] = useState(false);
-
   // -------------------------------------------------------------------------
   // Client-side validation
   // -------------------------------------------------------------------------
@@ -165,44 +155,14 @@ export default function Register() {
         console.error("Failed to save user profile to database:", dbError);
       }
 
-      // Step E: Send Firebase email verification (same infrastructure as password reset)
-      let emailSent = false;
-      try {
-        await sendEmailVerification(user);
-        emailSent = true;
-      } catch (mailErr: any) {
-        console.error("Email verification send failed:", mailErr);
-        emailSent = false;
-      }
-
       // Mark that this is a brand-new registration so the currency
       // setup dialog shows exactly once on the first dashboard visit.
       localStorage.setItem("showCurrencySetup", "true");
-      if (!emailSent) setInitialEmailFailed(true);
-
-      // Show the email verification prompt before entering the app
-      setStep("email-verify");
+      navigate("/dashboard", { replace: true });
     } catch (err) {
       setErrorMessage(parseFirebaseError(err));
     } finally {
       setIsSubmitting(false);
-    }
-  }
-
-  // Resend Firebase email verification from the email-verify step
-  async function handleResendEmailFromStep(): Promise<void> {
-    if (!auth.currentUser) return;
-    setResendEmailSending(true);
-    setResendEmailError(null);
-    setResendEmailSent(false);
-    try {
-      await sendEmailVerification(auth.currentUser);
-      setResendEmailSent(true);
-      setTimeout(() => setResendEmailSent(false), 8000);
-    } catch (e: any) {
-      setResendEmailError(e.message ?? "Failed to resend. Please try again.");
-    } finally {
-      setResendEmailSending(false);
     }
   }
 
@@ -244,88 +204,8 @@ export default function Register() {
       <div className="w-full max-w-md rounded-2xl p-8" style={{ background: "rgba(255,255,255,0.85)", border: "1px solid rgba(255,255,255,0.95)", boxShadow: "0 4px 16px rgba(124,58,237,0.10), 0 12px 48px rgba(124,58,237,0.08), inset 0 1px 0 rgba(255,255,255,1)", backdropFilter: "blur(20px)" }}>
 
         {/* ================================================================ */}
-        {/* Email verification prompt (after registration / phone OTP)       */}
+        {/* Main registration form                                            */}
         {/* ================================================================ */}
-        {step === "email-verify" && (
-          <>
-            <div className="mb-8 text-center">
-              <div
-                className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full"
-                style={{
-                  background: "linear-gradient(135deg, #f59e0b, #d97706)",
-                  boxShadow: "0 4px 20px rgba(245,158,11,0.40), inset 0 1px 0 rgba(255,255,255,0.25)",
-                }}
-              >
-                {/* Envelope icon */}
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-              </div>
-              <h1 className="text-2xl font-bold tracking-tight text-foreground">Verify your email</h1>
-              <p className="mt-1 text-sm text-muted-foreground">
-                We sent an activation link to
-              </p>
-              <p className="mt-0.5 text-sm font-semibold text-foreground">{email.trim()}</p>
-            </div>
-
-            {/* Warning banner if initial send failed */}
-            {initialEmailFailed && !resendEmailSent && (
-              <div className="mb-4 rounded-xl border border-red-200 bg-red-50/70 dark:bg-red-900/10 dark:border-red-800/40 px-4 py-3">
-                <p className="text-sm font-semibold text-red-700 dark:text-red-400">Email could not be sent</p>
-                <p className="text-xs text-red-600 dark:text-red-300 mt-0.5">
-                  Our mail server may not be configured yet. Click <strong>Resend</strong> below to try again, or contact support.
-                </p>
-              </div>
-            )}
-
-            {/* Info box */}
-            <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50/70 dark:bg-amber-900/10 dark:border-amber-800/40 px-4 py-4 space-y-1.5">
-              <p className="text-sm text-foreground font-medium">What to do next:</p>
-              <ol className="list-decimal list-inside space-y-1 text-sm text-muted-foreground">
-                <li>Open the email in your inbox</li>
-                <li>Click the <strong className="text-foreground">Activate account</strong> button</li>
-                <li>Come back and sign in</li>
-              </ol>
-              <p className="text-xs text-muted-foreground pt-1">The link expires in <strong>24 hours</strong>. Check your spam folder if you don't see it.</p>
-            </div>
-
-            {/* Resend button */}
-            <button
-              type="button"
-              onClick={handleResendEmailFromStep}
-              disabled={resendEmailSending || resendEmailSent}
-              className={`w-full rounded-lg px-4 py-2.5 text-sm font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-60 ${
-                resendEmailSent
-                  ? "bg-green-600 text-white"
-                  : "bg-amber-500 hover:bg-amber-600 text-white"
-              }`}
-            >
-              {resendEmailSending
-                ? "Sending…"
-                : resendEmailSent
-                ? "✓ Email resent! Check your inbox"
-                : "Resend activation email"}
-            </button>
-
-            {resendEmailError && (
-              <p className="mt-2 text-xs text-destructive text-center">{resendEmailError}</p>
-            )}
-
-            {/* Continue to dashboard */}
-            <button
-              type="button"
-              onClick={() => navigate("/dashboard", { replace: true })}
-              className="mt-4 w-full text-center text-sm text-muted-foreground underline-offset-4 hover:underline"
-            >
-              Continue to dashboard →
-            </button>
-          </>
-        )}
-
-        {/* ================================================================ */}
-        {/* Main registration form (step === "form")                          */}
-        {/* ================================================================ */}
-        {step === "form" && (
         <>
         {/* ---------------------------------------------------------------- */}
         {/* Header                                                            */}
@@ -577,7 +457,6 @@ export default function Register() {
           </Link>
         </p>
         </>
-        )}
       </div>
     </div>
   );
