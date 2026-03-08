@@ -71,6 +71,16 @@ function initSchema(db) {
     CREATE INDEX IF NOT EXISTS users_firebase_uid_idx
       ON users (firebase_uid);
 
+    -- Temporary phone OTPs — keyed by E.164 phone number.
+    -- Stores the 6-digit code and its expiry while the user completes verification.
+    -- Row is deleted on successful verification or replaced on resend.
+    CREATE TABLE IF NOT EXISTS phone_otps (
+      phone      TEXT PRIMARY KEY,
+      otp        TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
     -- Migration: add OTP columns to existing databases that lack them
     CREATE TEMPORARY TABLE IF NOT EXISTS _col_check (dummy TEXT);
     DROP TABLE _col_check;
