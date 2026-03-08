@@ -44,7 +44,7 @@ export function ProfileSettings() {
   const [resetSent,    setResetSent]    = useState(false);
   const [resetError,   setResetError]   = useState<string | null>(null);
 
-  // ── Phone number (fetched from backend profile) ────────────────────────────
+  // ── Phone number state (fetched from backend profile) ─────────────────────────
   const [phone, setPhone] = useState<string | null>(null);
 
   useEffect(() => {
@@ -185,7 +185,7 @@ export function ProfileSettings() {
           )}
         </div>
 
-        {/* ── Email (read-only) + verification status ───────────────────── */}
+        {/* ── Email (read-only) ─────────────────────────────────────────── */}
         <div className="space-y-2">
           <Label htmlFor="email" className="flex items-center gap-1.5">
             <Mail className="h-3.5 w-3.5" />
@@ -202,7 +202,7 @@ export function ProfileSettings() {
           <p className="text-xs text-muted-foreground">Email address cannot be changed here.</p>
         </div>
 
-        {/* ── Phone number + verification ───────────────────────────────── */}
+        {/* ── Phone number (read-only) ──────────────────────────────────── */}
         <div className="space-y-2">
           <Label htmlFor="phone" className="flex items-center gap-1.5">
             <Phone className="h-3.5 w-3.5" />
@@ -217,6 +217,11 @@ export function ProfileSettings() {
             placeholder={phone === null ? "Not set" : undefined}
             className="opacity-70 cursor-not-allowed"
           />
+          {!phone && (
+            <p className="text-xs text-muted-foreground">
+              No phone number saved. You can add one by re-registering or updating your profile.
+            </p>
+          )}
         </div>
 
         {/* ── Password reset (only for email/password accounts) ─────────── */}

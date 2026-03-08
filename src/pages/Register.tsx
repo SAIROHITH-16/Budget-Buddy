@@ -98,6 +98,8 @@ export default function Register() {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isGoogleSubmitting, setIsGoogleSubmitting] = useState<boolean>(false);
 
+
+
   // -------------------------------------------------------------------------
   // Client-side validation
   // -------------------------------------------------------------------------
