@@ -138,7 +138,15 @@ export default function Login() {
   // Render
   // -------------------------------------------------------------------------
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
+    <div
+      className="flex min-h-screen items-center justify-center bg-transparent p-4"
+      style={{
+        backgroundImage: [
+          "radial-gradient(ellipse 80% 50% at 10% 0%, rgba(255,180,120,0.18) 0%, transparent 60%)",
+          "radial-gradient(ellipse 55% 40% at 90% 100%, rgba(165,130,250,0.18) 0%, transparent 55%)",
+        ].join(", "),
+      }}
+    >
       {/* Main card */}
       <div className="flex w-full max-w-5xl overflow-hidden rounded-[2rem] shadow-xl" style={{ minHeight: "600px" }}>
 
@@ -178,7 +186,14 @@ export default function Login() {
         {/* ---------------------------------------------------------------- */}
         {/* RIGHT — white login form                                          */}
         {/* ---------------------------------------------------------------- */}
-        <div className="flex w-full flex-col bg-white px-8 py-10 md:w-1/2">
+        <div
+          className="flex w-full flex-col px-8 py-10 md:w-1/2"
+          style={{
+            background: "rgba(255,255,255,0.85)",
+            border: "1px solid rgba(255,255,255,0.95)",
+            backdropFilter: "blur(20px)",
+          }}
+        >
 
           {/* Header */}
           <div className="mb-8 text-center">
