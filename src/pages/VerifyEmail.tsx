@@ -15,14 +15,6 @@ import { sendEmailVerification, reload } from "firebase/auth";
 import { useAuth } from "@/context/AuthContext";
 import { auth } from "@/firebase";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import {
   Mail,
   RefreshCw,
   LogOut,
@@ -119,97 +111,110 @@ export default function VerifyEmail() {
   if (!currentUser) return null;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md shadow-lg">
-        <CardHeader className="text-center space-y-3 pb-4">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-            <Mail className="h-8 w-8 text-primary" />
-          </div>
-          <CardTitle className="text-2xl">Verify your email</CardTitle>
-          <CardDescription className="text-sm leading-relaxed">
-            We sent a verification link to{" "}
-            <strong className="text-foreground">{currentUser.email}</strong>.
-            <br />
-            Click the link in that email, then come back and press the button below.
-          </CardDescription>
-        </CardHeader>
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#0a0a0a] px-4">
 
-        <CardContent className="space-y-3">
-          {/* ── Primary CTA: confirm verification ─────────────────────── */}
-          <Button className="w-full" onClick={handleCheckVerified} disabled={checking}>
-            {checking ? (
-              <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Checking…</>
-            ) : (
-              <><CheckCircle2 className="mr-2 h-4 w-4" />I've verified my email</>
-            )}
-          </Button>
+      {/* Ambient glow */}
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute -left-40 -top-40 h-[600px] w-[600px] rounded-full bg-purple-800/20 blur-[140px]" />
+        <div className="absolute -bottom-40 right-0 h-[700px] w-[700px] rounded-full bg-purple-600/20 blur-[140px]" />
+      </div>
 
-          {checkError && (
-            <p className="flex items-start gap-2 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-              {checkError}
+      {/* Card */}
+      <div className="relative z-10 w-full max-w-sm">
+        <div className="rounded-3xl border border-[rgba(255,255,255,0.05)] bg-[rgba(255,255,255,0.05)] p-8 backdrop-blur-[20px]">
+
+          {/* Icon + heading */}
+          <div className="mb-6 text-center">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#6366f1] to-[#a855f7]">
+              <Mail className="h-7 w-7 text-white" />
+            </div>
+            <h2 className="text-2xl font-bold text-white">Verify your email</h2>
+            <p className="mt-2 text-sm leading-relaxed text-white/50">
+              We sent a verification link to{" "}
+              <span className="font-semibold text-white/80">{currentUser.email}</span>.
+              <br />
+              Click the link, then press the button below.
             </p>
-          )}
+          </div>
 
-          {/* ── Error from initial send at registration ────────────── */}
+          {/* Error from initial send at registration */}
           {initialSendError && (
-            <p className="flex items-start gap-2 rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-800">
-              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-              <span><strong>Initial email failed to send:</strong> {initialSendError}. Use the Resend button below.</span>
-            </p>
+            <div className="mb-4 flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2.5">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+              <p className="text-xs text-amber-300">
+                <span className="font-semibold">Initial email failed:</span> {initialSendError}. Use Resend below.
+              </p>
+            </div>
           )}
 
-          {/* ── Resend button ──────────────────────────────────────────── */}
-          <Button
-            variant="outline"
-            className="w-full"
-            onClick={handleResend}
-            disabled={resendSending || resendCooldown > 0}
-          >
-            {resendSending ? (
-              <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Sending…</>
-            ) : resendSent ? (
-              <><CheckCircle2 className="mr-2 h-4 w-4 text-green-600" />Email sent!</>
-            ) : resendCooldown > 0 ? (
-              <><RefreshCw className="mr-2 h-4 w-4" />Resend in {resendCooldown}s</>
-            ) : (
-              <><RefreshCw className="mr-2 h-4 w-4" />Resend verification email</>
+          <div className="space-y-3">
+            {/* Primary CTA */}
+            <button
+              onClick={handleCheckVerified}
+              disabled={checking}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#6366f1] to-[#a855f7] px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {checking ? (
+                <><Loader2 className="h-4 w-4 animate-spin" />Checking…</>
+              ) : (
+                <><CheckCircle2 className="h-4 w-4" />I&apos;ve verified my email</>
+              )}
+            </button>
+
+            {checkError && (
+              <div className="flex items-start gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2.5">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-400" />
+                <p className="text-xs text-red-400">{checkError}</p>
+              </div>
             )}
-          </Button>
 
-          {resendError && (
-            <p className="flex items-start gap-2 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-              {resendError}
+            {/* Resend */}
+            <button
+              onClick={handleResend}
+              disabled={resendSending || resendCooldown > 0}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-white/70 transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {resendSending ? (
+                <><Loader2 className="h-4 w-4 animate-spin" />Sending…</>
+              ) : resendSent ? (
+                <><CheckCircle2 className="h-4 w-4 text-green-400" />Email sent!</>
+              ) : resendCooldown > 0 ? (
+                <><RefreshCw className="h-4 w-4" />Resend in {resendCooldown}s</>
+              ) : (
+                <><RefreshCw className="h-4 w-4" />Resend verification email</>
+              )}
+            </button>
+
+            {resendError && (
+              <div className="flex items-start gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2.5">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-400" />
+                <p className="text-xs text-red-400">{resendError}</p>
+              </div>
+            )}
+
+            {/* Divider */}
+            <div className="relative flex items-center gap-3 py-1">
+              <div className="h-px flex-1 bg-white/10" />
+              <span className="text-xs text-white/30">or</span>
+              <div className="h-px flex-1 bg-white/10" />
+            </div>
+
+            {/* Sign out */}
+            <button
+              onClick={handleSignOut}
+              className="flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm text-white/40 transition-colors hover:text-white/70"
+            >
+              <LogOut className="h-4 w-4" />
+              Sign out and use a different account
+            </button>
+
+            <p className="text-center text-xs text-white/25">
+              Didn&apos;t receive the email? Check spam, wait 60 s, then use <span className="text-white/50">Resend</span>.
             </p>
-          )}
-
-          {/* ── Divider ───────────────────────────────────────────────── */}
-          <div className="relative py-1">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">or</span>
-            </div>
           </div>
 
-          {/* ── Sign out ──────────────────────────────────────────────── */}
-          <Button
-            variant="ghost"
-            className="w-full text-muted-foreground"
-            onClick={handleSignOut}
-          >
-            <LogOut className="mr-2 h-4 w-4" />
-            Sign out and use a different account
-          </Button>
-
-          <p className="text-center text-xs text-muted-foreground">
-            Didn&apos;t receive the email? Check your spam folder, wait 60 seconds,
-            then use <strong>Resend</strong> above.
-          </p>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }
