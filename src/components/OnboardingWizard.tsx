@@ -124,6 +124,9 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     try {
       localStorage.setItem("preferredCurrency", currency);
       window.dispatchEvent(new CustomEvent("currencyChange", { detail: currency }));
+      // Ensure backend profile exists regardless of path taken through wizard
+      // (fire-and-forget — non-blocking).
+      api.post("/auth/firebase-login").catch(() => {});
       // Brief pause so the button spinner is visible
       await new Promise((r) => setTimeout(r, 350));
       onComplete();

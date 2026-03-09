@@ -410,119 +410,11 @@ router.post("/verify-otp", async (req, res) => {
 //   6. Send OTP SMS via Fast2SMS (quick 'q' route)
 //   7. Return userId so the client can call /verify-registration
 // ---------------------------------------------------------------------------
-router.post("/register", async (req, res) => {
-  try {
-    const bcrypt = require("bcryptjs");
-    const User   = require("../models/User");
-
-    const { name, email, password, phoneNumber } = req.body;
-
-    // ── 1. Validate required fields ─────────────────────────────────────────
-    if (!name || !email || !password || !phoneNumber) {
-      return res.status(400).json({
-        success: false,
-        error: "name, email, password, and phoneNumber are all required.",
-      });
-    }
-    if (password.length < 6) {
-      return res.status(400).json({ success: false, error: "Password must be at least 6 characters." });
-    }
-
-    // ── 2. Normalise phone to E.164 ─────────────────────────────────────────
-    const digits = phoneNumber.replace(/\D/g, "");
-    const local  = digits.length === 12 && digits.startsWith("91") ? digits.slice(2)
-                 : digits.length === 10 ? digits
-                 : null;
-    if (!local) {
-      return res.status(400).json({
-        success: false,
-        error: "phoneNumber must be a valid 10-digit Indian mobile number.",
-      });
-    }
-    const e164 = `+91${local}`;
-
-    // ── 3. Check for duplicates ─────────────────────────────────────────────
-    const normalEmail = email.toLowerCase().trim();
-    const [emailExists, phoneExists] = await Promise.all([
-      User.findOne({ email: normalEmail }),
-      User.findOne({ phone: e164 }),
-    ]);
-    if (emailExists) {
-      return res.status(409).json({ success: false, error: "An account with this email already exists." });
-    }
-    if (phoneExists) {
-      return res.status(409).json({ success: false, error: "An account with this phone number already exists." });
-    }
-
-    // ── 4. Hash password ────────────────────────────────────────────────────
-    const hashedPassword = await bcrypt.hash(password, 12);
-
-    // ── 5. Generate OTP ─────────────────────────────────────────────────────
-    const otp       = String(randomInt(100000, 999999));
-    const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-
-    // ── 6. Save user to MongoDB (unverified) ────────────────────────────────
-    const user = await User.create({
-      name:            name.trim(),
-      email:           normalEmail,
-      phone:           e164,
-      password:        hashedPassword,
-      otpCode:         otp,
-      otpExpiry,
-      isPhoneVerified: false,
-    });
-
-    // ── 7. Send OTP via Fast2SMS (quick route) ──────────────────────────────
-    const apiKey = process.env.FAST2SMS_API_KEY;
-    if (!apiKey) {
-      // Roll back the created user so state stays consistent
-      await User.deleteOne({ _id: user._id });
-      return res.status(503).json({ success: false, error: "Server misconfigured: FAST2SMS_API_KEY missing." });
-    }
-
-    const axios = require("axios");
-    const smsResp = await axios.post(
-      "https://www.fast2sms.com/dev/bulkV2",
-      {
-        route:            "q",
-        message:          `Your Budget Buddy verification code is ${otp}. It expires in 10 minutes. Do not share it with anyone.`,
-        language:         "english",
-        numbers:          local,
-        flash:            0,
-      },
-      {
-        headers: {
-          authorization: apiKey,
-          "cache-control": "no-cache",
-        },
-      }
-    );
-
-    if (!smsResp.data || smsResp.data.return === false) {
-      await User.deleteOne({ _id: user._id });
-      console.error("[auth] Fast2SMS register error:", smsResp.data);
-      return res.status(502).json({
-        success: false,
-        error:   "Failed to send verification SMS. Please try again.",
-        details: smsResp.data?.message,
-      });
-    }
-
-    return res.status(201).json({
-      success: true,
-      message: "OTP sent to your mobile number. Please verify to complete registration.",
-      userId:  user._id,
-    });
-
-  } catch (err) {
-    console.error("[auth] POST /register error:", err);
-    // Mongoose duplicate-key error
-    if (err.code === 11000) {
-      const field = Object.keys(err.keyPattern || {})[0] || "field";
-      return res.status(409).json({ success: false, error: `An account with this ${field} already exists.` });
-    }
-    return res.status(500).json({ success: false, error: "Registration failed.", message: err.message });
-  }
+router.post("/register", (_req, res) => {
+  return res.status(501).json({
+    success: false,
+    error: "This endpoint is no longer active. The app uses Firebase Authentication for registration. Please use the frontend sign-up flow.",
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -537,82 +429,11 @@ router.post("/register", async (req, res) => {
 // Body:    { userId, otp }
 // Returns: { success: true, token: "<JWT>", user: { id, name, email, phone } }
 // ---------------------------------------------------------------------------
-router.post("/verify-registration", async (req, res) => {
-  try {
-    const jwt  = require("jsonwebtoken");
-    const User = require("../models/User");
-
-    const { userId, otp } = req.body;
-
-    if (!userId || !otp) {
-      return res.status(400).json({ success: false, error: "userId and otp are required." });
-    }
-    if (!/^\d{6}$/.test(String(otp))) {
-      return res.status(400).json({ success: false, error: "otp must be a 6-digit number." });
-    }
-
-    // ── 1. Fetch user — explicitly select the hidden OTP fields ─────────────
-    const user = await User.findById(userId).select("+otpCode +otpExpiry");
-    if (!user) {
-      return res.status(404).json({ success: false, error: "User not found." });
-    }
-    if (user.isPhoneVerified) {
-      return res.status(400).json({ success: false, error: "Phone number already verified." });
-    }
-
-    // ── 2. Check OTP expiry ─────────────────────────────────────────────────
-    if (!user.otpExpiry || new Date() > user.otpExpiry) {
-      return res.status(400).json({
-        success: false,
-        error: "OTP has expired. Please register again to receive a new code.",
-      });
-    }
-
-    // ── 3. Constant-time OTP comparison ─────────────────────────────────────
-    const { timingSafeEqual } = require("crypto");
-    const expected = Buffer.from(String(user.otpCode));
-    const received = Buffer.from(String(otp));
-    const valid = expected.length === received.length &&
-                  timingSafeEqual(expected, received);
-
-    if (!valid) {
-      return res.status(400).json({ success: false, error: "Invalid OTP. Please try again." });
-    }
-
-    // ── 4. Mark phone verified + clear OTP ──────────────────────────────────
-    user.isPhoneVerified = true;
-    user.otpCode         = undefined;
-    user.otpExpiry       = undefined;
-    await user.save();
-
-    // ── 5. Issue JWT ─────────────────────────────────────────────────────────
-    const jwtSecret = process.env.JWT_SECRET;
-    if (!jwtSecret) {
-      console.error("[auth] JWT_SECRET is not set");
-      return res.status(503).json({ success: false, error: "Server misconfigured: JWT_SECRET missing." });
-    }
-
-    const token = jwt.sign(
-      { userId: user._id, email: user.email, phone: user.phone },
-      jwtSecret,
-      { expiresIn: "7d" }
-    );
-
-    return res.status(200).json({
-      success: true,
-      token,
-      user: {
-        id:    user._id,
-        name:  user.name,
-        email: user.email,
-        phone: user.phone,
-      },
-    });
-
-  } catch (err) {
-    console.error("[auth] POST /verify-registration error:", err);
-    return res.status(500).json({ success: false, error: "Verification failed.", message: err.message });
-  }
+router.post("/verify-registration", (_req, res) => {
+  return res.status(501).json({
+    success: false,
+    error: "This endpoint is no longer active. The app uses Firebase Authentication for registration. Please use the frontend sign-up flow.",
+  });
 });
 
 // ---------------------------------------------------------------------------

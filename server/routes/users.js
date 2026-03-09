@@ -288,16 +288,25 @@ router.patch("/update-phone", verifyToken, (req, res) => {
       return res.status(400).json({ success: false, error: "A valid phone number is required." });
     }
 
-    const db   = getDb();
+    const db  = getDb();
+    const now = new Date().toISOString();
     const user = db.prepare("SELECT id FROM users WHERE firebase_uid = ?").get(firebaseUid);
 
     if (!user) {
-      return res.status(404).json({ success: false, error: "User profile not found." });
+      // Profile not created yet (e.g. first Google login before firebase-login synced).
+      // Create it now using JWT claims so the phone can be saved immediately.
+      const { email, name: tokenName } = req.user;
+      const resolvedName  = tokenName || (email ? email.split("@")[0] : "User");
+      const resolvedEmail = email || null;
+      db.prepare(`
+        INSERT INTO users (id, firebase_uid, name, email, phone, is_phone_verified, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, 1, ?, ?)
+      `).run(randomUUID(), firebaseUid, resolvedName, resolvedEmail, phone.trim(), now, now);
+    } else {
+      db.prepare(
+        "UPDATE users SET phone = ?, is_phone_verified = 1, updated_at = ? WHERE firebase_uid = ?"
+      ).run(phone.trim(), now, firebaseUid);
     }
-
-    db.prepare(
-      "UPDATE users SET phone = ?, is_phone_verified = 1, updated_at = ? WHERE firebase_uid = ?"
-    ).run(phone.trim(), new Date().toISOString(), firebaseUid);
 
     return res.status(200).json({ success: true, message: "Phone number updated successfully." });
   } catch (err) {

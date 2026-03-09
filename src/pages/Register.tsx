@@ -269,6 +269,9 @@ export default function Register() {
       setGoogleUid(user.uid);
       setGoogleEmail(user.email ?? "");
       setGoogleName(user.displayName ?? "");
+      // Ensure SQLite profile exists for this Google user (fire-and-forget).
+      // This runs concurrently — the phone dialog shows immediately.
+      api.post("/auth/firebase-login", { name: user.displayName ?? undefined }).catch(() => {});
       // Show phone number dialog — currency dialog will follow
       setShowPhoneDialog(true);
     } catch (err) {

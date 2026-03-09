@@ -416,40 +416,30 @@ router.post("/bulk", async (req, res) => {
   }
 
   // -------------------------------------------------------------------------
-  // 2. Per-row validation — build Mongoose documents and call validateSync()
-  //    so that schema validators (enum, min, required, etc.) run before we
-  //    touch the database.  Collect ALL errors first so the caller gets a
-  //    complete picture in a single round-trip.
+  // 2. Per-row validation using the plain validateRow() helper.
+  //    Collect ALL errors first so the caller gets a complete picture in a
+  //    single round-trip.
   // -------------------------------------------------------------------------
-  const docs   = [];   // validated Transaction instances, ready to insert
-  const errors = [];   // { row, fields } for every invalid row
+  const docs   = [];   // valid plain objects ready for SQLite insert
+  const errors = [];   // { row, errors } for every invalid row
 
   transactions.forEach((item, index) => {
     const rowNum = index + 1;  // 1-based for human-readable messages
 
-    // Inject the authenticated user's UID — callers must not supply this.
-    const doc = new Transaction({
+    const errs = validateRow(item);
+    if (errs.length > 0) {
+      errors.push({ row: rowNum, errors: errs });
+      return;
+    }
+
+    docs.push({
       uid:         req.user.uid,
       type:        item.type,
-      amount:      item.amount !== undefined ? Number(item.amount) : undefined,
+      amount:      Number(item.amount),
       category:    item.category?.trim()    || "Uncategorized",
       description: item.description?.trim() || "",
-      date:        item.date ? new Date(item.date) : undefined,
+      date:        item.date,
     });
-
-    // validateSync() runs all schema validators synchronously and returns a
-    // ValidationError (with an `errors` map) if anything is wrong, or
-    // undefined if the document is valid.
-    const validationError = doc.validateSync();
-
-    if (validationError) {
-      const fieldMessages = Object.entries(validationError.errors).map(
-        ([field, err]) => `${field}: ${err.message}`
-      );
-      errors.push({ row: rowNum, errors: fieldMessages });
-    } else {
-      docs.push(doc);
-    }
   });
 
   // If any row failed validation, reject the entire batch.
@@ -462,11 +452,7 @@ router.post("/bulk", async (req, res) => {
   }
 
   // -------------------------------------------------------------------------
-  // 3. Bulk insert — single round-trip to MongoDB.
-  //    insertMany() with ordered:true (the default) stops on the first DB-level
-  //    error (e.g. a duplicate-key violation) and surfaces it here.
-  //    Because we pre-validated everything above, hitting this catch block
-  //    would mean an unexpected infrastructure error, not bad input.
+  // 3. Bulk insert — single SQLite transaction.
   // -------------------------------------------------------------------------
   try {
     const result = await db.insertMany(TX_COLL, docs);
