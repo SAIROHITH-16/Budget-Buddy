@@ -4,6 +4,10 @@
   "description": "Express + MongoDB backend for Budget Buddy with Firebase Admin authentication",
   "main": "index.js",
   "type": "commonjs",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js"

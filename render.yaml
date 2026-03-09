@@ -1,0 +1,30 @@
+# render.yaml — Render deployment configuration
+# Docs: https://render.com/docs/infrastructure-as-code
+#
+# This file explicitly configures the Express backend as a Node.js service.
+# Without it, Render detects the root-level bun.lockb (used by the Vite
+# frontend) and defaults to Bun — which cannot load better-sqlite3 (native addon).
+
+services:
+  - type: web
+    name: budget-buddy-server
+    runtime: node          # Force Node.js — never Bun
+    rootDir: server        # All commands run from the server/ subdirectory
+    buildCommand: npm install
+    startCommand: node index.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # The following secrets must be set in the Render dashboard
+      # (Environment → Secret Files or Environment Variables):
+      #
+      #   PORT                    — Render sets this automatically; leave unset
+      #   FIREBASE_PROJECT_ID
+      #   FIREBASE_PRIVATE_KEY_ID
+      #   FIREBASE_PRIVATE_KEY    — full PEM, keep the \n escapes
+      #   FIREBASE_CLIENT_EMAIL
+      #   FIREBASE_CLIENT_ID
+      #   CORS_ORIGIN             — e.g. https://budgetbuddy1.vercel.app
+      #   FRONTEND_URL            — e.g. https://budgetbuddy1.vercel.app
+      #   PHONE_EMAIL_CLIENT_SECRET
