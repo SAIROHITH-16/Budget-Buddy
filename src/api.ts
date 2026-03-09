@@ -34,13 +34,29 @@ import { auth } from "@/firebase";
 // "localhost" or a LAN IP address (e.g. http://192.168.1.x:8081).
 // Priority: explicit VITE_API_URL env var → same host as the page on port 3001.
 function resolveBaseURL(): string {
+  // 1. Explicit override (baked in at Vite build time) — highest priority.
+  //    Set VITE_API_URL in Vercel / Railway / your CI environment.
   const envUrl = import.meta.env.VITE_API_URL;
   if (envUrl) return envUrl;
-  // In the browser, use the same host/IP the page was loaded from
-  if (typeof window !== "undefined") {
-    return `${window.location.protocol}//${window.location.hostname}:3001/api`;
+
+  // 2. Development: the Vite dev server proxies /api → localhost:3001,
+  //    so a relative path is all we need.
+  if (import.meta.env.DEV) return "/api";
+
+  // 3. Production fallback: use a relative /api path.
+  //    For this to work on Vercel you must add an API proxy rewrite in
+  //    vercel.json  OR  set VITE_API_URL to your backend's full URL.
+  //    Without one of those, every API call will 404.
+  if (import.meta.env.PROD) {
+    console.warn(
+      "[api] VITE_API_URL is not set. API calls will use /api (relative).\n" +
+      "      Add VITE_API_URL=https://your-backend-url/api to your Vercel" +
+      " environment variables, or add an API proxy rewrite to vercel.json."
+    );
+    return "/api";
   }
-  return "http://localhost:3001/api";
+
+  return "/api";
 }
 
 const api: AxiosInstance = axios.create({

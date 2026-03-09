@@ -120,6 +120,7 @@ export default function Register() {
   // Currency dialog (shown after phone dialog)
   const [showCurrencyDialog, setShowCurrencyDialog] = useState<boolean>(false);
   const [selectedCurrency, setSelectedCurrency] = useState<string>("USD");
+  const [googleName, setGoogleName] = useState<string>("");
 
   // -------------------------------------------------------------------------
   // Phone.Email handler — called by the global listener once the user verifies
@@ -267,6 +268,7 @@ export default function Register() {
       const user = credential.user;
       setGoogleUid(user.uid);
       setGoogleEmail(user.email ?? "");
+      setGoogleName(user.displayName ?? "");
       // Show phone number dialog — currency dialog will follow
       setShowPhoneDialog(true);
     } catch (err) {
@@ -283,11 +285,9 @@ export default function Register() {
     setDialogPhoneSaving(true);
     try {
       const fullPhone = `${dialogCountryCode}${dialogPhone.trim()}`;
-      await api.post("/users/profile", {
-        firebaseUid: googleUid,
-        email: googleEmail,
-        phone: fullPhone,
-      });
+      // Use PATCH /update-phone (protected, uses verified Firebase token) rather
+      // than POST /profile (which needs name and might conflict with an existing row).
+      await api.patch("/users/update-phone", { phone: fullPhone });
     } catch {
       // Non-fatal — proceed regardless
     } finally {

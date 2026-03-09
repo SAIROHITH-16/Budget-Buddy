@@ -10,6 +10,14 @@ export default defineConfig({
     hmr: {
       overlay: false,
     },
+    // Proxy /api requests to the Express backend during local development.
+    // This means you don't need VITE_API_URL set in .env for dev.
+    proxy: {
+      "/api": {
+        target: "http://localhost:3001",
+        changeOrigin: true,
+      },
+    },
   },
   plugins: [react()],
   build: {

@@ -14,10 +14,11 @@
 //   3. If the user is NOT authenticated → redirects to /login, preserving the
 //      originally requested URL in `state.from` so Login can redirect back.
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { OnboardingWizard } from "@/components/OnboardingWizard";
+import api from "@/api";
 
 // ---------------------------------------------------------------------------
 // ProtectedRoute Component
@@ -34,11 +35,46 @@ export function ProtectedRoute({ redirectTo = "/login" }: ProtectedRouteProps) {
   const { currentUser, loading } = useAuth();
   const location = useLocation();
 
-  // Onboarding is considered complete once the user has chosen a currency.
-  // Initialised from localStorage so it survives page refreshes.
-  const [onboardingDone, setOnboardingDone] = useState<boolean>(
-    () => !!localStorage.getItem("preferredCurrency")
+  // Three-state onboarding check:
+  //   "checking" — we are asking the backend whether this user already has a profile
+  //   true       — onboarding is done, show the app normally
+  //   false      — new user (no backend profile + no local currency), show wizard
+  //
+  // Fast path: if localStorage already has a preferred currency the user has
+  // set up before (on this device), skip the backend call entirely.
+  const [onboardingState, setOnboardingState] = useState<"checking" | boolean>(
+    () => (!!localStorage.getItem("preferredCurrency") ? true : "checking")
   );
+
+  // Track the UID we last checked so we don't re-query on every render
+  const checkedUid = useRef<string | null>(null);
+
+  useEffect(() => {
+    // Only run once per signed-in user, and only if the fast-path didn't already
+    // resolve the state.
+    if (onboardingState !== "checking") return;
+    if (!currentUser) return;
+    if (checkedUid.current === currentUser.uid) return;
+
+    checkedUid.current = currentUser.uid;
+
+    api
+      .get("/users/profile")
+      .then(() => {
+        // Profile exists → returning user. Mark as done so they go straight to
+        // the app. They can manage currency any time from Settings.
+        setOnboardingState(true);
+      })
+      .catch((err) => {
+        if (err?.response?.status === 404) {
+          // Genuinely new user — no backend profile yet → show the wizard.
+          setOnboardingState(false);
+        } else {
+          // Network error or server error — don't block the user; let them in.
+          setOnboardingState(true);
+        }
+      });
+  }, [currentUser, onboardingState]);
 
   // While Firebase resolves the persisted session, render a spinner instead of
   // redirecting — avoids a race condition where a valid session looks like "no user".
@@ -61,14 +97,24 @@ export function ProtectedRoute({ redirectTo = "/login" }: ProtectedRouteProps) {
   }
 
   // User is authenticated and verified — render the nested <Route> children.
-  // If the user hasn't completed onboarding yet, show the forced setup modal
-  // overlaid on top of the outlet so it covers the entire viewport.
+  // While we are still checking whether this user already has a backend profile,
+  // show the same loading spinner to avoid a jarring flash of the wizard.
   if (currentUser !== null) {
+    if (onboardingState === "checking") {
+      return (
+        <div className="flex min-h-screen items-center justify-center bg-background">
+          <div className="flex flex-col items-center gap-3">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+            <p className="text-sm text-muted-foreground">Loading your profile…</p>
+          </div>
+        </div>
+      );
+    }
     return (
       <>
         <Outlet />
-        {!onboardingDone && (
-          <OnboardingWizard onComplete={() => setOnboardingDone(true)} />
+        {onboardingState === false && (
+          <OnboardingWizard onComplete={() => setOnboardingState(true)} />
         )}
       </>
     );
