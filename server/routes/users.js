@@ -270,4 +270,40 @@ router.post("/mark-phone-verified", verifyToken, (req, res) => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// PATCH /api/users/update-phone
+// Updates the phone number stored in SQLite for the authenticated user.
+// Firebase Phone Auth has already verified the new number on the client side
+// before this endpoint is called.
+// Protected by verifyToken — requires valid Firebase JWT.
+//
+// Body: { phone }  (E.164 format, e.g. "+919876543210")
+// ---------------------------------------------------------------------------
+router.patch("/update-phone", verifyToken, (req, res) => {
+  try {
+    const firebaseUid = req.user.uid;
+    const { phone }   = req.body;
+
+    if (!phone || typeof phone !== "string" || phone.trim().length < 5) {
+      return res.status(400).json({ success: false, error: "A valid phone number is required." });
+    }
+
+    const db   = getDb();
+    const user = db.prepare("SELECT id FROM users WHERE firebase_uid = ?").get(firebaseUid);
+
+    if (!user) {
+      return res.status(404).json({ success: false, error: "User profile not found." });
+    }
+
+    db.prepare(
+      "UPDATE users SET phone = ?, is_phone_verified = 1, updated_at = ? WHERE firebase_uid = ?"
+    ).run(phone.trim(), new Date().toISOString(), firebaseUid);
+
+    return res.status(200).json({ success: true, message: "Phone number updated successfully." });
+  } catch (err) {
+    console.error("[users] PATCH /update-phone error:", err);
+    return res.status(500).json({ success: false, error: "Failed to update phone number.", message: err.message });
+  }
+});
+
 module.exports = router;

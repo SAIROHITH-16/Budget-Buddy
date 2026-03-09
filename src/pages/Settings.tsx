@@ -3,6 +3,7 @@ import { ProfileSettings } from "@/components/ProfileSettings";
 import { BudgetSettings } from "@/components/BudgetSettings";
 import { CurrencySettings } from "@/components/CurrencySettings";
 import { CurrencySetupDialog } from "@/components/CurrencySetupDialog";
+import { PhoneSettings } from "@/components/PhoneSettings";
 import { Settings as SettingsIcon } from "lucide-react";
 
 const Settings = () => {
@@ -21,6 +22,7 @@ const Settings = () => {
         </div>
 
         <ProfileSettings />
+        <PhoneSettings />
         <CurrencySettings />
         <BudgetSettings />
       </div>
