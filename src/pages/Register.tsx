@@ -287,14 +287,14 @@ export default function Register() {
             }}
           >
             {/* Signup icon: person silhouette + circle-plus badge bottom-right */}
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
-              {/* Head */}
-              <circle cx="9" cy="7" r="4.5" />
-              {/* Left shoulder arc curving from bottom-left up to badge edge */}
-              <path d="M1.5 21 C2 16 6 13 13.5 13.5" fill="none" />
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+              {/* Head circle */}
+              <circle cx="10" cy="7" r="4.8" />
+              {/* Body arc: large circular arc from bottom-left to where badge begins */}
+              <path d="M1.5 22 A10 10 0 0 1 14 13.5" fill="none" />
               {/* Plus badge circle */}
-              <circle cx="18.5" cy="18.5" r="4.5" />
-              {/* Plus */}
+              <circle cx="18.5" cy="18.5" r="4.8" />
+              {/* Plus vertical + horizontal */}
               <line x1="18.5" y1="15.8" x2="18.5" y2="21.2" />
               <line x1="15.8" y1="18.5" x2="21.2" y2="18.5" />
             </svg>
