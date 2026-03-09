@@ -16,6 +16,14 @@ dist-ssr
 server/.env
 .env
 
+# SQLite database files — created automatically by the server on first run.
+# Never commit these: they are binary, contain user data, and Render/cloud
+# hosting has an ephemeral filesystem that resets on every deploy anyway.
+server/data/*.db
+server/data/*.db-shm
+server/data/*.db-wal
+server/data/*.db-journal
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
