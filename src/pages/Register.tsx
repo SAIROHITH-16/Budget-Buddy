@@ -286,17 +286,19 @@ export default function Register() {
               boxShadow: "0 4px 20px rgba(124,58,237,0.40), inset 0 1px 0 rgba(255,255,255,0.25)",
             }}
           >
-            {/* Signup icon: person silhouette + circle-plus badge bottom-right */}
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-              {/* Head circle */}
-              <circle cx="10" cy="7" r="4.8" />
-              {/* Body arc: large circular arc from bottom-left to where badge begins */}
-              <path d="M1.5 22 A10 10 0 0 1 14 13.5" fill="none" />
-              {/* Plus badge circle */}
-              <circle cx="18.5" cy="18.5" r="4.8" />
-              {/* Plus vertical + horizontal */}
-              <line x1="18.5" y1="15.8" x2="18.5" y2="21.2" />
-              <line x1="15.8" y1="18.5" x2="21.2" y2="18.5" />
+            {/* Signup icon: rounded rect frame (open bottom-right) with person + plus */}
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
+              {/* Frame top edge + right side (stops ~60% down) */}
+              <path d="M5 2 H19 Q22 2 22 5 V14" fill="none" />
+              {/* Frame bottom (starts ~60% across) + left side + top-left corner */}
+              <path d="M14 22 H5 Q2 22 2 19 V5 Q2 2 5 2" fill="none" />
+              {/* Head */}
+              <circle cx="11" cy="9" r="3" />
+              {/* Shoulders arc */}
+              <path d="M6.5 18 A5 5 0 0 1 15.5 18" fill="none" />
+              {/* Plus sign in gap */}
+              <line x1="19" y1="17" x2="19" y2="22" />
+              <line x1="16.5" y1="19.5" x2="21.5" y2="19.5" />
             </svg>
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">
