@@ -93,15 +93,25 @@ export default function ForgotPassword() {
               boxShadow: "0 4px 20px rgba(124,58,237,0.40), inset 0 1px 0 rgba(255,255,255,0.25)",
             }}
           >
-            {/* ForgotPassword icon: shield with lock + asterisks */}
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 2l7 3v5c0 4.5-3 8.5-7 10C5 18.5 2 14.5 2 10V5l7-3z" />
-              <rect x="9" y="9" width="6" height="5" rx="1" />
-              <path d="M10 9V7.5a2 2 0 1 1 4 0V9" />
-              <line x1="8.5" y1="16.5" x2="8.5" y2="16.5" strokeWidth={2.5} />
-              <line x1="11" y1="16.5" x2="11" y2="16.5" strokeWidth={2.5} />
-              <line x1="13.5" y1="16.5" x2="13.5" y2="16.5" strokeWidth={2.5} />
-              <line x1="16" y1="16.5" x2="16" y2="16.5" strokeWidth={2.5} />
+            {/* ForgotPassword icon: shield with padlock + asterisk row */}
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 64 64" stroke="currentColor" strokeWidth={3.2} strokeLinecap="round" strokeLinejoin="round">
+              {/* Shield */}
+              <path d="M32 4 L58 13 L58 32 C58 47 46 58 32 62 C18 58 6 47 6 32 L6 13 Z" />
+              {/* Lock body */}
+              <rect x="22" y="28" width="20" height="16" rx="3" />
+              {/* Lock shackle */}
+              <path d="M26 28 L26 23 A6 6 0 0 1 38 23 L38 28" />
+              {/* Keyhole dot */}
+              <line x1="32" y1="33" x2="32" y2="38" strokeWidth={2.5} />
+              {/* Asterisks row */}
+              {/* asterisk 1 */}
+              <line x1="16" y1="50" x2="16" y2="56" /><line x1="13" y1="51.5" x2="19" y2="54.5" /><line x1="19" y1="51.5" x2="13" y2="54.5" />
+              {/* asterisk 2 */}
+              <line x1="24" y1="50" x2="24" y2="56" /><line x1="21" y1="51.5" x2="27" y2="54.5" /><line x1="27" y1="51.5" x2="21" y2="54.5" />
+              {/* asterisk 3 */}
+              <line x1="40" y1="50" x2="40" y2="56" /><line x1="37" y1="51.5" x2="43" y2="54.5" /><line x1="43" y1="51.5" x2="37" y2="54.5" />
+              {/* asterisk 4 */}
+              <line x1="48" y1="50" x2="48" y2="56" /><line x1="45" y1="51.5" x2="51" y2="54.5" /><line x1="51" y1="51.5" x2="45" y2="54.5" />
             </svg>
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">
