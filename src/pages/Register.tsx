@@ -16,7 +16,6 @@ import { type FirebaseError } from "firebase/app";
 import { updateProfile, signInWithCustomToken, auth } from "@/firebase";
 import { sendEmailVerification } from "firebase/auth";
 import api from "@/api";
-import { useToast } from "@/hooks/use-toast";
 import {
   Select,
   SelectContent,
@@ -24,6 +23,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 
 // ---------------------------------------------------------------------------
 // Phone number placeholders by country code
@@ -86,7 +92,6 @@ function parseFirebaseError(error: unknown): string {
 export default function Register() {
   const { signUpEmail, signInGoogle } = useAuth();
   const navigate = useNavigate();
-  const { toast } = useToast();
 
   // Form state
   const [name, setName] = useState<string>("");
@@ -99,6 +104,14 @@ export default function Register() {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isGoogleSubmitting, setIsGoogleSubmitting] = useState<boolean>(false);
   const [isPhoneSubmitting, setIsPhoneSubmitting] = useState<boolean>(false);
+
+  // Phone dialog (shown after Google sign-up)
+  const [showPhoneDialog, setShowPhoneDialog] = useState<boolean>(false);
+  const [dialogCountryCode, setDialogCountryCode] = useState<string>("+91");
+  const [dialogPhone, setDialogPhone] = useState<string>("");
+  const [dialogPhoneSaving, setDialogPhoneSaving] = useState<boolean>(false);
+  const [googleUid, setGoogleUid] = useState<string>("");
+  const [googleEmail, setGoogleEmail] = useState<string>("");
 
   // -------------------------------------------------------------------------
   // Phone.Email handler — called by the global listener once the user verifies
@@ -236,33 +249,51 @@ export default function Register() {
   }
 
   // -------------------------------------------------------------------------
-  // Google sign-up handler
+  // Google sign-up handler — opens phone dialog, then forces currency setup
   // -------------------------------------------------------------------------
   async function handleGoogleSignUp(): Promise<void> {
     setErrorMessage(null);
     setIsGoogleSubmitting(true);
     try {
-      await signInGoogle();
-      // For Google sign-in, show currency setup only if this is a new account
-      // (a simple check on whether preferredCurrency is already saved works for
-      // all cases — returning users will already have this key set).
-      if (!localStorage.getItem("preferredCurrency")) {
-        localStorage.setItem("showCurrencySetup", "true");
-      }
-      navigate("/dashboard", { replace: true });
-      // Google accounts have no phone by default — nudge user to add one
-      setTimeout(() => {
-        toast({
-          title: "Add your phone number",
-          description: "Visit Settings to add a phone number so you can sign in with it later.",
-          duration: 8000,
-        });
-      }, 800);
+      const credential = await signInGoogle();
+      const user = credential.user;
+      setGoogleUid(user.uid);
+      setGoogleEmail(user.email ?? "");
+      // Always force currency setup for Google sign-ins
+      localStorage.setItem("showCurrencySetup", "true");
+      // Show phone number dialog before proceeding to dashboard
+      setShowPhoneDialog(true);
     } catch (err) {
       setErrorMessage(parseFirebaseError(err));
     } finally {
       setIsGoogleSubmitting(false);
     }
+  }
+
+  // -------------------------------------------------------------------------
+  // Phone dialog — save phone then go to dashboard (currency dialog auto-opens)
+  // -------------------------------------------------------------------------
+  async function handleDialogSavePhone(): Promise<void> {
+    setDialogPhoneSaving(true);
+    try {
+      const fullPhone = `${dialogCountryCode}${dialogPhone.trim()}`;
+      await api.post("/users/profile", {
+        firebaseUid: googleUid,
+        email: googleEmail,
+        phone: fullPhone,
+      });
+    } catch {
+      // Non-fatal — proceed to dashboard regardless
+    } finally {
+      setDialogPhoneSaving(false);
+    }
+    setShowPhoneDialog(false);
+    navigate("/dashboard", { replace: true });
+  }
+
+  function handleDialogSkip(): void {
+    setShowPhoneDialog(false);
+    navigate("/dashboard", { replace: true });
   }
 
   // -------------------------------------------------------------------------
@@ -318,8 +349,8 @@ export default function Register() {
               <svg className="h-6 w-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
                 <circle cx="12" cy="7" r="4"/>
-                <line x1="19" y1="8" x2="19" y2="14"/>
-                <line x1="22" y1="11" x2="16" y2="11"/>
+                <line x1="20" y1="8" x2="20" y2="14"/>
+                <line x1="23" y1="11" x2="17" y2="11"/>
               </svg>
             </div>
             <h2 className="text-2xl font-bold text-gray-900">Create account</h2>
@@ -521,5 +552,84 @@ export default function Register() {
         </div>
       </div>
     </div>
+
+    {/* ── Phone number dialog (shown after Google sign-up) ────────────── */}
+    <Dialog open={showPhoneDialog} onOpenChange={() => {}}>
+      <DialogContent
+        className="sm:max-w-sm rounded-2xl"
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+      >
+        <DialogHeader>
+          <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#7C3AED]">
+            <svg className="h-6 w-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 1.27h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.91a16 16 0 0 0 6 6l.92-.92a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
+            </svg>
+          </div>
+          <DialogTitle className="text-center text-xl font-bold text-gray-900">
+            Add your phone number
+          </DialogTitle>
+          <DialogDescription className="text-center text-sm text-gray-500">
+            Add a phone number to sign in with SMS later. You can skip this step.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="mt-2 space-y-4">
+          <div className="space-y-1.5">
+            <label className="block text-sm font-medium text-gray-700">Phone number <span className="font-normal text-gray-400">(optional)</span></label>
+            <div className="flex gap-2">
+              <Select value={dialogCountryCode} onValueChange={setDialogCountryCode} disabled={dialogPhoneSaving}>
+                <SelectTrigger className="w-[110px] rounded-xl border border-gray-200 bg-white text-sm text-gray-900">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="+91">+91 (IN)</SelectItem>
+                  <SelectItem value="+1">+1 (US)</SelectItem>
+                  <SelectItem value="+44">+44 (UK)</SelectItem>
+                  <SelectItem value="+61">+61 (AU)</SelectItem>
+                  <SelectItem value="+49">+49 (DE)</SelectItem>
+                  <SelectItem value="+81">+81 (JP)</SelectItem>
+                  <SelectItem value="+971">+971 (AE)</SelectItem>
+                  <SelectItem value="+65">+65 (SG)</SelectItem>
+                </SelectContent>
+              </Select>
+              <input
+                type="tel"
+                inputMode="numeric"
+                autoComplete="tel"
+                value={dialogPhone}
+                onChange={(e) => {
+                  const digits = e.target.value.replace(/\D/g, "");
+                  const maxLen = phoneMaxLengths[dialogCountryCode] ?? 15;
+                  setDialogPhone(digits.slice(0, maxLen));
+                }}
+                className="flex-1 rounded-xl border border-gray-200 py-2.5 px-4 text-sm text-gray-900 placeholder:text-gray-400 focus:border-[#7C3AED] focus:outline-none focus:ring-1 focus:ring-[#7C3AED] disabled:opacity-50"
+                placeholder={phonePlaceholders[dialogCountryCode] || "Enter phone"}
+                maxLength={phoneMaxLengths[dialogCountryCode] ?? 15}
+                disabled={dialogPhoneSaving}
+              />
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleDialogSavePhone}
+            disabled={dialogPhoneSaving || dialogPhone.trim().length < 6}
+            className="w-full rounded-xl bg-[#7C3AED] py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {dialogPhoneSaving ? "Saving…" : "Save & Continue"}
+          </button>
+
+          <button
+            type="button"
+            onClick={handleDialogSkip}
+            disabled={dialogPhoneSaving}
+            className="w-full rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-500 transition-colors hover:bg-gray-50 disabled:opacity-50"
+          >
+            Skip for now
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
