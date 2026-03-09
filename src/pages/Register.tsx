@@ -286,17 +286,17 @@ export default function Register() {
               boxShadow: "0 4px 20px rgba(124,58,237,0.40), inset 0 1px 0 rgba(255,255,255,0.25)",
             }}
           >
-            {/* Signup icon: user silhouette in open arc circle with + top-right */}
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 512 512" stroke="currentColor" strokeWidth={36} strokeLinecap="round" strokeLinejoin="round">
-              {/* Open circle arc (gap at top-right ~40°–80°) */}
-              <path d="M420 92 A210 210 0 1 0 448 256" fill="none" />
+            {/* Signup icon: person silhouette + circle-plus badge bottom-right */}
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 512 512" stroke="currentColor" strokeWidth={30} strokeLinecap="round" strokeLinejoin="round">
               {/* Head */}
-              <circle cx="230" cy="185" r="72" />
-              {/* Shoulders arc */}
-              <path d="M80 420 C80 330 380 330 380 420" fill="none" />
-              {/* Plus sign top-right */}
-              <line x1="400" y1="60" x2="400" y2="140" strokeWidth={40} />
-              <line x1="360" y1="100" x2="440" y2="100" strokeWidth={40} />
+              <circle cx="195" cy="155" r="115" />
+              {/* Shoulder arc */}
+              <path d="M 48 490 A 210 210 0 0 1 310 360" fill="none" />
+              {/* + badge circle */}
+              <circle cx="385" cy="368" r="108" />
+              {/* + lines */}
+              <line x1="385" y1="300" x2="385" y2="436" />
+              <line x1="317" y1="368" x2="453" y2="368" />
             </svg>
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">
