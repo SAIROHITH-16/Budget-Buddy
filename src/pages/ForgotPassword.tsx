@@ -63,8 +63,8 @@ export default function ForgotPassword() {
   // Render
   // ---------------------------------------------------------------------------
   return (
-    <div
-      className="flex min-h-screen items-center justify-center bg-background px-4 py-12"
+    <div 
+      className="flex min-h-screen items-center justify-center bg-background px-4"
       style={{
         backgroundImage: [
           "radial-gradient(ellipse 80% 50% at 10% 0%, rgba(255,180,120,0.18) 0%, transparent 60%)",
@@ -72,100 +72,109 @@ export default function ForgotPassword() {
         ].join(", ")
       }}
     >
-      <div className="w-full max-w-md">
-        {/* Card */}
-        <div
-          className="rounded-2xl p-8"
-          style={{
-            background: "rgba(255,255,255,0.88)",
-            border: "1px solid rgba(255,255,255,0.95)",
-            boxShadow: "0 4px 16px rgba(124,58,237,0.10), 0 12px 48px rgba(124,58,237,0.08), inset 0 1px 0 rgba(255,255,255,1)",
-            backdropFilter: "blur(20px)",
-          }}
-        >
-          {/* Logo + heading */}
-          <div className="mb-8 flex flex-col items-center text-center">
-            <div
-              className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl"
-              style={{
-                background: "linear-gradient(135deg, #7c3aed, #4f46e5)",
-                boxShadow: "0 4px 20px rgba(124,58,237,0.40), inset 0 1px 0 rgba(255,255,255,0.25)",
-              }}
-            >
-              <img src="/logo.png" alt="Budget Buddy" className="h-9 w-9 object-contain" />
-            </div>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">Reset your password</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {success ? "We've sent you an email" : "Enter your email address and we'll send you a reset link"}
-            </p>
+      <div 
+        className="w-full max-w-md rounded-2xl border border-border bg-card p-8"
+        style={{
+          boxShadow: [
+            "0 4px 16px rgba(124,58,237,0.10)",
+            "0 12px 48px rgba(124,58,237,0.08)",
+            "inset 0 1px 0 rgba(255,255,255,1)",
+          ].join(", ")
+        }}
+      >
+        {/* ---------------------------------------------------------------- */}
+        {/* Header                                                            */}
+        {/* ---------------------------------------------------------------- */}
+        <div className="mb-8 text-center">
+          <div 
+            className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl"
+            style={{
+              background: "linear-gradient(135deg, #7c3aed, #a855f7)",
+              boxShadow: "0 4px 20px rgba(124,58,237,0.40), inset 0 1px 0 rgba(255,255,255,0.25)",
+            }}
+          >
+            <img src="/logo.png" alt="Budget Buddy" className="h-8 w-8 rounded object-contain" />
           </div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">
+            Reset your password
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {success
+              ? "We've sent you an email"
+              : "Enter your email address and we'll send you a reset link"}
+          </p>
+        </div>
 
-          {success ? (
-            // Success state
-            <div className="space-y-6">
-              <div className="rounded-lg border border-primary/40 bg-primary/10 p-4">
-                <p className="text-sm text-center text-foreground">
-                  Check your inbox for a reset link. If you don't see it, check your spam folder.
-                </p>
+        {/* ---------------------------------------------------------------- */}
+        {/* Success or Form Content                                           */}
+        {/* ---------------------------------------------------------------- */}
+        {success ? (
+          // Success state
+          <div className="space-y-6">
+            <div className="rounded-lg border border-primary/40 bg-primary/10 p-4">
+              <p className="text-sm text-center text-foreground">
+                Check your inbox for a reset link. If you don't see it, check your spam folder.
+              </p>
+            </div>
+
+            <Link
+              to="/login"
+              className="block w-full rounded-lg border border-input bg-background px-4 py-2.5 text-center text-sm font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+            >
+              Back to Login
+            </Link>
+          </div>
+        ) : (
+          // Form state
+          <form onSubmit={handleResetPassword} noValidate className="space-y-4">
+            {/* Error message */}
+            {error && (
+              <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3">
+                <p className="text-sm text-destructive">{error}</p>
               </div>
+            )}
+
+            {/* Email input */}
+            <div className="space-y-1.5">
+              <label
+                htmlFor="email"
+                className="block text-sm font-medium text-foreground"
+              >
+                Email address
+              </label>
+              <input
+                id="email"
+                type="email"
+                autoComplete="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                disabled={isLoading}
+                className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50"
+              />
+            </div>
+
+            {/* Submit button */}
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isLoading ? "Sending..." : "Send reset link"}
+            </button>
+
+            {/* Back to login link */}
+            <div className="text-center">
               <Link
                 to="/login"
-                className="block w-full rounded-lg py-2.5 text-center text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
-                style={{ background: "linear-gradient(135deg, #7c3aed, #4f46e5)" }}
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors underline-offset-4 hover:underline"
               >
                 Back to Login
               </Link>
             </div>
-          ) : (
-            // Form state
-            <form onSubmit={handleResetPassword} noValidate className="space-y-4">
-              {/* Error message */}
-              {error && (
-                <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3">
-                  <p className="text-sm text-destructive">{error}</p>
-                </div>
-              )}
-
-              {/* Email input */}
-              <div className="space-y-1.5">
-                <label htmlFor="email" className="block text-sm font-medium text-foreground">
-                  Email address
-                </label>
-                <input
-                  id="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  disabled={isLoading}
-                  className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50"
-                />
-              </div>
-
-              {/* Submit button */}
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full rounded-lg py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-                style={{ background: "linear-gradient(135deg, #7c3aed, #4f46e5)" }}
-              >
-                {isLoading ? "Sending..." : "Send reset link"}
-              </button>
-
-              {/* Back to login link */}
-              <div className="text-center">
-                <Link
-                  to="/login"
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors underline-offset-4 hover:underline"
-                >
-                  Back to Login
-                </Link>
-              </div>
-            </form>
-          )}
-        </div>
+          </form>
+        )}
       </div>
     </div>
   );
