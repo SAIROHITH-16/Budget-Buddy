@@ -14,9 +14,10 @@
 //   3. If the user is NOT authenticated → redirects to /login, preserving the
 //      originally requested URL in `state.from` so Login can redirect back.
 
-import React from "react";
+import React, { useState } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
+import { OnboardingModal } from "@/components/OnboardingModal";
 
 // ---------------------------------------------------------------------------
 // ProtectedRoute Component
@@ -32,6 +33,12 @@ interface ProtectedRouteProps {
 export function ProtectedRoute({ redirectTo = "/login" }: ProtectedRouteProps) {
   const { currentUser, loading } = useAuth();
   const location = useLocation();
+
+  // Onboarding is considered complete once the user has chosen a currency.
+  // Initialised from localStorage so it survives page refreshes.
+  const [onboardingDone, setOnboardingDone] = useState<boolean>(
+    () => !!localStorage.getItem("preferredCurrency")
+  );
 
   // While Firebase resolves the persisted session, render a spinner instead of
   // redirecting — avoids a race condition where a valid session looks like "no user".
@@ -53,9 +60,18 @@ export function ProtectedRoute({ redirectTo = "/login" }: ProtectedRouteProps) {
     return <Navigate to="/verify-email" replace />;
   }
 
-  // User is authenticated and verified — render the nested <Route> children
+  // User is authenticated and verified — render the nested <Route> children.
+  // If the user hasn't completed onboarding yet, show the forced setup modal
+  // overlaid on top of the outlet so it covers the entire viewport.
   if (currentUser !== null) {
-    return <Outlet />;
+    return (
+      <>
+        <Outlet />
+        {!onboardingDone && (
+          <OnboardingModal onComplete={() => setOnboardingDone(true)} />
+        )}
+      </>
+    );
   }
 
   // User is NOT authenticated — redirect to the login page.
