@@ -219,7 +219,7 @@ export function ProfileSettings() {
           />
           {!phone && (
             <p className="text-xs text-muted-foreground">
-              No phone number saved. You can add one by re-registering or updating your profile.
+              No phone number saved. Use the <span className="font-medium text-foreground">Update Phone Number</span> section below to add one.
             </p>
           )}
         </div>

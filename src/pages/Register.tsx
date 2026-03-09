@@ -583,14 +583,13 @@ export default function Register() {
             Add Your Phone Number
           </DialogTitle>
           <DialogDescription className="text-base pt-2">
-            Add a phone number so you can sign in with SMS later.
-            You can skip this — it can also be added from Settings.
+            Enter your phone number to secure your account and enable quick SMS sign-in.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
           <div className="space-y-2">
-            <Label htmlFor="dialog-phone">Phone number <span className="font-normal text-muted-foreground">(optional)</span></Label>
+            <Label htmlFor="dialog-phone">Phone number</Label>
             <div className="flex gap-2">
               <Select value={dialogCountryCode} onValueChange={(v) => { setDialogCountryCode(v); setDialogPhone(""); }} disabled={dialogPhoneSaving}>
                 <SelectTrigger className="w-[120px] shrink-0">
