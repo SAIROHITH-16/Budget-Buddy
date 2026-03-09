@@ -109,15 +109,10 @@ export default function Register() {
   const [isGoogleSubmitting, setIsGoogleSubmitting] = useState<boolean>(false);
   const [isPhoneSubmitting, setIsPhoneSubmitting] = useState<boolean>(false);
 
-  // Phone dialog (shown after Google sign-up)
-  const [showPhoneDialog, setShowPhoneDialog] = useState<boolean>(false);
-  const [dialogCountryCode, setDialogCountryCode] = useState<string>("+91");
-  const [dialogPhone, setDialogPhone] = useState<string>("");
-  const [dialogPhoneSaving, setDialogPhoneSaving] = useState<boolean>(false);
   const [googleUid, setGoogleUid] = useState<string>("");
   const [googleEmail, setGoogleEmail] = useState<string>("");
 
-  // Currency dialog (shown after phone dialog)
+  // Currency dialog (shown after Google sign-up)
   const [showCurrencyDialog, setShowCurrencyDialog] = useState<boolean>(false);
   const [selectedCurrency, setSelectedCurrency] = useState<string>("USD");
   const [googleName, setGoogleName] = useState<string>("");
@@ -258,7 +253,7 @@ export default function Register() {
   }
 
   // -------------------------------------------------------------------------
-  // Google sign-up handler — opens phone dialog, currency dialog follows
+  // Google sign-up handler — opens currency dialog directly
   // -------------------------------------------------------------------------
   async function handleGoogleSignUp(): Promise<void> {
     setErrorMessage(null);
@@ -270,40 +265,14 @@ export default function Register() {
       setGoogleEmail(user.email ?? "");
       setGoogleName(user.displayName ?? "");
       // Ensure SQLite profile exists for this Google user (fire-and-forget).
-      // This runs concurrently — the phone dialog shows immediately.
       api.post("/auth/firebase-login", { name: user.displayName ?? undefined }).catch(() => {});
-      // Show phone number dialog — currency dialog will follow
-      setShowPhoneDialog(true);
+      // Show currency dialog
+      setShowCurrencyDialog(true);
     } catch (err) {
       setErrorMessage(parseFirebaseError(err));
     } finally {
       setIsGoogleSubmitting(false);
     }
-  }
-
-  // -------------------------------------------------------------------------
-  // Phone dialog — save phone then open currency dialog
-  // -------------------------------------------------------------------------
-  async function handleDialogSavePhone(): Promise<void> {
-    setDialogPhoneSaving(true);
-    try {
-      const fullPhone = `${dialogCountryCode}${dialogPhone.trim()}`;
-      // Use PATCH /update-phone (protected, uses verified Firebase token) rather
-      // than POST /profile (which needs name and might conflict with an existing row).
-      await api.patch("/users/update-phone", { phone: fullPhone });
-    } catch {
-      // Non-fatal — proceed regardless
-    } finally {
-      setDialogPhoneSaving(false);
-    }
-    setShowPhoneDialog(false);
-    setShowCurrencyDialog(true);
-  }
-
-  // Skip phone — still must choose currency
-  function handleDialogSkip(): void {
-    setShowPhoneDialog(false);
-    setShowCurrencyDialog(true);
   }
 
   // -------------------------------------------------------------------------
@@ -574,86 +543,7 @@ export default function Register() {
       </div>
     </div>
 
-    {/* Phone number dialog (shown after Google sign-up) */}
-    <Dialog open={showPhoneDialog} onOpenChange={() => {}}>
-      <DialogContent
-        className="sm:max-w-md"
-        onPointerDownOutside={(e) => e.preventDefault()}
-        onEscapeKeyDown={(e) => e.preventDefault()}
-      >
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-xl">
-            <Phone className="h-6 w-6 text-primary" />
-            Add Your Phone Number
-          </DialogTitle>
-          <DialogDescription className="text-base pt-2">
-            Enter your phone number to secure your account and enable quick SMS sign-in.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4 py-4">
-          <div className="space-y-2">
-            <Label htmlFor="dialog-phone">Phone number</Label>
-            <div className="flex gap-2">
-              <Select value={dialogCountryCode} onValueChange={(v) => { setDialogCountryCode(v); setDialogPhone(""); }} disabled={dialogPhoneSaving}>
-                <SelectTrigger className="w-[120px] shrink-0">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="+91">+91 (IN)</SelectItem>
-                  <SelectItem value="+1">+1 (US)</SelectItem>
-                  <SelectItem value="+44">+44 (UK)</SelectItem>
-                  <SelectItem value="+61">+61 (AU)</SelectItem>
-                  <SelectItem value="+49">+49 (DE)</SelectItem>
-                  <SelectItem value="+81">+81 (JP)</SelectItem>
-                  <SelectItem value="+971">+971 (AE)</SelectItem>
-                  <SelectItem value="+65">+65 (SG)</SelectItem>
-                </SelectContent>
-              </Select>
-              <Input
-                id="dialog-phone"
-                type="tel"
-                inputMode="numeric"
-                autoComplete="tel"
-                value={dialogPhone}
-                onChange={(e) => {
-                  const digits = e.target.value.replace(/\D/g, "");
-                  const maxLen = phoneMaxLengths[dialogCountryCode] ?? 15;
-                  setDialogPhone(digits.slice(0, maxLen));
-                }}
-                placeholder={phonePlaceholders[dialogCountryCode] || "Enter phone"}
-                maxLength={phoneMaxLengths[dialogCountryCode] ?? 15}
-                disabled={dialogPhoneSaving}
-              />
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {phoneMaxLengths[dialogCountryCode] ?? 15} digits required · {dialogCountryCode}
-            </p>
-          </div>
-        </div>
-
-        <Button
-          onClick={handleDialogSavePhone}
-          disabled={dialogPhoneSaving || dialogPhone.trim().length < 6}
-          className="w-full"
-          size="lg"
-        >
-          <Phone className="h-5 w-5 mr-2" />
-          {dialogPhoneSaving ? "Saving…" : `Continue with ${dialogCountryCode}`}
-        </Button>
-
-        <Button
-          variant="outline"
-          onClick={handleDialogSkip}
-          disabled={dialogPhoneSaving}
-          className="w-full"
-        >
-          Skip for now
-        </Button>
-      </DialogContent>
-    </Dialog>
-
-    {/* Currency dialog (shown after phone dialog) */}
+    {/* Currency dialog (shown after Google sign-up) */}
     <Dialog open={showCurrencyDialog} onOpenChange={() => {}}>
       <DialogContent
         className="sm:max-w-md"

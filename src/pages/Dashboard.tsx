@@ -204,11 +204,7 @@ const Dashboard = () => {
           </div>
         )}
 
-        {error && (
-          <div className="glass-card p-4 border-destructive/30">
-            <p className="text-sm expense-text">{error}</p>
-          </div>
-        )}
+        {/* Network errors are intentionally silent — stat cards already show $0.00 */}
 
         {/* ------------------------------------------------------------------ */}
         {/* Stat cards                                                          */}
