@@ -64,7 +64,7 @@ export default function ForgotPassword() {
   // ---------------------------------------------------------------------------
   return (
     <div 
-      className="flex min-h-screen items-center justify-center bg-background px-4"
+      className="flex min-h-screen items-center justify-center bg-transparent px-4"
       style={{
         backgroundImage: [
           "radial-gradient(ellipse 80% 50% at 10% 0%, rgba(255,180,120,0.18) 0%, transparent 60%)",
@@ -73,13 +73,16 @@ export default function ForgotPassword() {
       }}
     >
       <div 
-        className="w-full max-w-md rounded-2xl border border-border bg-card p-8"
+        className="w-full max-w-md rounded-2xl p-8"
         style={{
+          background: "rgba(255,255,255,0.85)",
+          border: "1px solid rgba(255,255,255,0.95)",
           boxShadow: [
             "0 4px 16px rgba(124,58,237,0.10)",
             "0 12px 48px rgba(124,58,237,0.08)",
             "inset 0 1px 0 rgba(255,255,255,1)",
-          ].join(", ")
+          ].join(", "),
+          backdropFilter: "blur(20px)",
         }}
       >
         {/* ---------------------------------------------------------------- */}
