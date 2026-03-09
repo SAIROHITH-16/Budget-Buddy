@@ -50,7 +50,7 @@ const userSchema = new mongoose.Schema(
     // -----------------------------------------------------------------------
     email: {
       type: String,
-      required: [true, "Email is required"],
+      required: false,   // Firebase users may sign in with phone only (no email)
       trim: true,
       lowercase: true,
       match: [
@@ -60,11 +60,12 @@ const userSchema = new mongoose.Schema(
     },
 
     // -----------------------------------------------------------------------
-    // phone — User's phone number (required)
+    // phone — User's phone number (optional: email/password or Google users
+    //         may not have a phone number until they add one in Settings)
     // -----------------------------------------------------------------------
     phone: {
       type: String,
-      required: [true, "Phone number is required"],
+      required: false,
       trim: true,
       validate: {
         validator: function(v) {

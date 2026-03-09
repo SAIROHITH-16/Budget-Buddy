@@ -614,5 +614,111 @@ router.post("/verify-registration", async (req, res) => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// POST /api/auth/firebase-login
+// ---------------------------------------------------------------------------
+// Called by the frontend after every successful Firebase sign-in
+// (email/password, Google, custom token, etc.).
+//
+// The route reads identity data straight from the verified JWT claims so the
+// client doesn't need to send a body — the Firebase ID token alone is enough.
+// An optional body `{ name?, phone? }` can be supplied to override the
+// JWT display name or to attach a phone number not present in the token.
+//
+// Behaviour:
+//   • User already in SQLite   → update display name if token/body provides one
+//   • User not in SQLite yet   → INSERT a new row (upsert-on-login)
+//
+// Returns: { success: true, user: { ... }, created: boolean }
+//          201 on first-time creation, 200 on update
+// ---------------------------------------------------------------------------
+router.post("/firebase-login", verifyToken, (req, res) => {
+  try {
+    // ── Extract identity from the verified JWT ──────────────────────────────
+    const { uid, email, name: tokenName } = req.user;
+
+    // Optional overrides from the request body
+    const bodyName  = (req.body?.name  || "").trim() || undefined;
+    const bodyPhone = (req.body?.phone || "").trim() || undefined;
+
+    const resolvedName  = bodyName || tokenName || (email ? email.split("@")[0] : "User");
+    const resolvedEmail = email || null;
+
+    const db  = getDb();
+    const now = new Date().toISOString();
+
+    // ── Check for existing record ───────────────────────────────────────────
+    const existing = db.prepare(
+      "SELECT * FROM users WHERE firebase_uid = ?"
+    ).get(uid);
+
+    if (existing) {
+      // Update mutable fields — never overwrite phone with null on login
+      db.prepare(`
+        UPDATE users
+        SET name = ?, updated_at = ?
+        WHERE firebase_uid = ?
+      `).run(resolvedName, now, uid);
+
+      if (bodyPhone) {
+        db.prepare(
+          "UPDATE users SET phone = ?, updated_at = ? WHERE firebase_uid = ?"
+        ).run(bodyPhone, now, uid);
+      }
+
+      const updated = db.prepare(
+        "SELECT * FROM users WHERE firebase_uid = ?"
+      ).get(uid);
+
+      return res.status(200).json({
+        success: true,
+        created: false,
+        user: {
+          id:          updated.id,
+          firebaseUid: updated.firebase_uid,
+          name:        updated.name,
+          email:       updated.email,
+          phone:       updated.phone || null,
+          createdAt:   updated.created_at,
+          updatedAt:   updated.updated_at,
+        },
+      });
+    }
+
+    // ── First-time login — create a new record ──────────────────────────────
+    const id = randomUUID();
+    db.prepare(`
+      INSERT INTO users (id, firebase_uid, name, email, phone, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(id, uid, resolvedName, resolvedEmail, bodyPhone || null, now, now);
+
+    const created = db.prepare(
+      "SELECT * FROM users WHERE firebase_uid = ?"
+    ).get(uid);
+
+    return res.status(201).json({
+      success: true,
+      created: true,
+      user: {
+        id:          created.id,
+        firebaseUid: created.firebase_uid,
+        name:        created.name,
+        email:       created.email,
+        phone:       created.phone || null,
+        createdAt:   created.created_at,
+        updatedAt:   created.updated_at,
+      },
+    });
+
+  } catch (err) {
+    console.error("[auth] POST /firebase-login error:", err);
+    return res.status(500).json({
+      success:  false,
+      error:   "Login sync failed.",
+      message:  err.message,
+    });
+  }
+});
+
 module.exports = router;
 

@@ -15,6 +15,7 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { type FirebaseError } from "firebase/app";
 import { Eye, EyeOff } from "lucide-react";
+import api from "@/api";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3001";
 
@@ -107,7 +108,11 @@ export default function Login() {
         loginEmail = await resolvePhoneToEmail(loginEmail);
       }
 
-      await signInEmail(loginEmail, password);
+      const cred = await signInEmail(loginEmail, password);
+      // Sync user record to SQLite (fire-and-forget — non-critical)
+      api.post("/auth/firebase-login", {
+        name: cred.user.displayName ?? undefined,
+      }).catch(() => {});
       navigate(from, { replace: true });
     } catch (err) {
       // resolvePhoneToEmail throws a plain Error; Firebase throws FirebaseError
@@ -125,7 +130,11 @@ export default function Login() {
     setErrorMessage(null);
     setIsGoogleSubmitting(true);
     try {
-      await signInGoogle();
+      const cred = await signInGoogle();
+      // Sync user record to SQLite (fire-and-forget — non-critical)
+      api.post("/auth/firebase-login", {
+        name: cred.user.displayName ?? undefined,
+      }).catch(() => {});
       navigate(from, { replace: true });
     } catch (err) {
       setErrorMessage(parseFirebaseError(err));
