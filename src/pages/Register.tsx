@@ -289,14 +289,14 @@ export default function Register() {
             {/* Signup icon: person silhouette + circle-plus badge bottom-right */}
             <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
               {/* Head */}
-              <circle cx="10" cy="8" r="5" />
-              {/* Shoulder arc */}
-              <path d="M2 21a10 10 0 0 1 13.5-5.5" />
+              <circle cx="9" cy="7" r="4.5" />
+              {/* Left shoulder arc curving from bottom-left up to badge edge */}
+              <path d="M1.5 21 C2 16 6 13 13.5 13.5" fill="none" />
               {/* Plus badge circle */}
-              <circle cx="19.5" cy="19" r="3.8" />
+              <circle cx="18.5" cy="18.5" r="4.5" />
               {/* Plus */}
-              <line x1="19.5" y1="16.8" x2="19.5" y2="21.2" />
-              <line x1="17.3" y1="19" x2="21.7" y2="19" />
+              <line x1="18.5" y1="15.8" x2="18.5" y2="21.2" />
+              <line x1="15.8" y1="18.5" x2="21.2" y2="18.5" />
             </svg>
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">
