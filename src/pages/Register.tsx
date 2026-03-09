@@ -16,6 +16,7 @@ import { type FirebaseError } from "firebase/app";
 import { updateProfile, signInWithCustomToken, auth } from "@/firebase";
 import { sendEmailVerification } from "firebase/auth";
 import api from "@/api";
+import { Phone } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -30,6 +31,9 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 // ---------------------------------------------------------------------------
 // Phone number placeholders by country code
@@ -556,30 +560,27 @@ export default function Register() {
     {/* ── Phone number dialog (shown after Google sign-up) ────────────── */}
     <Dialog open={showPhoneDialog} onOpenChange={() => {}}>
       <DialogContent
-        className="sm:max-w-sm rounded-2xl"
+        className="sm:max-w-md"
         onPointerDownOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}
       >
         <DialogHeader>
-          <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#7C3AED]">
-            <svg className="h-6 w-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 1.27h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.91a16 16 0 0 0 6 6l.92-.92a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
-            </svg>
-          </div>
-          <DialogTitle className="text-center text-xl font-bold text-gray-900">
-            Add your phone number
+          <DialogTitle className="flex items-center gap-2 text-xl">
+            <Phone className="h-6 w-6 text-primary" />
+            Add Your Phone Number
           </DialogTitle>
-          <DialogDescription className="text-center text-sm text-gray-500">
-            Add a phone number to sign in with SMS later. You can skip this step.
+          <DialogDescription className="text-base pt-2">
+            Add a phone number so you can sign in with SMS later.
+            You can skip this — it can also be added from Settings.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="mt-2 space-y-4">
-          <div className="space-y-1.5">
-            <label className="block text-sm font-medium text-gray-700">Phone number <span className="font-normal text-gray-400">(optional)</span></label>
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="dialog-phone">Phone number <span className="font-normal text-muted-foreground">(optional)</span></Label>
             <div className="flex gap-2">
-              <Select value={dialogCountryCode} onValueChange={setDialogCountryCode} disabled={dialogPhoneSaving}>
-                <SelectTrigger className="w-[110px] rounded-xl border border-gray-200 bg-white text-sm text-gray-900">
+              <Select value={dialogCountryCode} onValueChange={(v) => { setDialogCountryCode(v); setDialogPhone(""); }} disabled={dialogPhoneSaving}>
+                <SelectTrigger className="w-[120px] shrink-0">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -593,7 +594,8 @@ export default function Register() {
                   <SelectItem value="+65">+65 (SG)</SelectItem>
                 </SelectContent>
               </Select>
-              <input
+              <Input
+                id="dialog-phone"
                 type="tel"
                 inputMode="numeric"
                 autoComplete="tel"
@@ -603,32 +605,35 @@ export default function Register() {
                   const maxLen = phoneMaxLengths[dialogCountryCode] ?? 15;
                   setDialogPhone(digits.slice(0, maxLen));
                 }}
-                className="flex-1 rounded-xl border border-gray-200 py-2.5 px-4 text-sm text-gray-900 placeholder:text-gray-400 focus:border-[#7C3AED] focus:outline-none focus:ring-1 focus:ring-[#7C3AED] disabled:opacity-50"
                 placeholder={phonePlaceholders[dialogCountryCode] || "Enter phone"}
                 maxLength={phoneMaxLengths[dialogCountryCode] ?? 15}
                 disabled={dialogPhoneSaving}
               />
             </div>
+            <p className="text-xs text-muted-foreground">
+              {phoneMaxLengths[dialogCountryCode] ?? 15} digits required · {dialogCountryCode}
+            </p>
           </div>
-
-          <button
-            type="button"
-            onClick={handleDialogSavePhone}
-            disabled={dialogPhoneSaving || dialogPhone.trim().length < 6}
-            className="w-full rounded-xl bg-[#7C3AED] py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {dialogPhoneSaving ? "Saving…" : "Save & Continue"}
-          </button>
-
-          <button
-            type="button"
-            onClick={handleDialogSkip}
-            disabled={dialogPhoneSaving}
-            className="w-full rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-500 transition-colors hover:bg-gray-50 disabled:opacity-50"
-          >
-            Skip for now
-          </button>
         </div>
+
+        <Button
+          onClick={handleDialogSavePhone}
+          disabled={dialogPhoneSaving || dialogPhone.trim().length < 6}
+          className="w-full"
+          size="lg"
+        >
+          <Phone className="h-5 w-5 mr-2" />
+          {dialogPhoneSaving ? "Saving…" : `Continue with ${dialogCountryCode}`}
+        </Button>
+
+        <Button
+          variant="outline"
+          onClick={handleDialogSkip}
+          disabled={dialogPhoneSaving}
+          className="w-full"
+        >
+          Skip for now
+        </Button>
       </DialogContent>
     </Dialog>
   );
