@@ -17,7 +17,7 @@
 import React, { useState } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { OnboardingModal } from "@/components/OnboardingModal";
+import { OnboardingWizard } from "@/components/OnboardingWizard";
 
 // ---------------------------------------------------------------------------
 // ProtectedRoute Component
@@ -68,7 +68,7 @@ export function ProtectedRoute({ redirectTo = "/login" }: ProtectedRouteProps) {
       <>
         <Outlet />
         {!onboardingDone && (
-          <OnboardingModal onComplete={() => setOnboardingDone(true)} />
+          <OnboardingWizard onComplete={() => setOnboardingDone(true)} />
         )}
       </>
     );
