@@ -95,8 +95,8 @@ export default function ForgotPassword() {
           >
             {/* ForgotPassword icon: speech bubble with padlock + asterisks */}
             <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 512 512" stroke="currentColor" strokeWidth={22} strokeLinecap="round" strokeLinejoin="round">
-              {/* Speech bubble body + tail */}
-              <path d="M55 18 H457 A55 55 0 0 1 512 73 V355 A55 55 0 0 1 457 410 H268 L225 468 L225 410 H55 A55 55 0 0 1 0 355 V73 A55 55 0 0 1 55 18 Z" />
+              {/* Speech bubble body + tail — bottom edge and tail moved down 24 SVG units (~1.5px) */}
+              <path d="M55 18 H457 A55 55 0 0 1 512 73 V379 A55 55 0 0 1 457 434 H268 L225 492 L225 434 H55 A55 55 0 0 1 0 379 V73 A55 55 0 0 1 55 18 Z" />
               {/* Lock shackle */}
               <path d="M198 188 V148 A58 58 0 0 1 314 148 V188" strokeWidth={20} />
               {/* Lock body */}
