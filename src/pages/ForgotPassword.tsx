@@ -63,136 +63,132 @@ export default function ForgotPassword() {
   // Render
   // ---------------------------------------------------------------------------
   return (
-    <div 
-      className="flex min-h-screen items-center justify-center bg-transparent px-4"
+    <div
+      className="flex min-h-screen items-center justify-center bg-transparent p-4"
       style={{
         backgroundImage: [
           "radial-gradient(ellipse 80% 50% at 10% 0%, rgba(255,180,120,0.18) 0%, transparent 60%)",
           "radial-gradient(ellipse 55% 40% at 90% 100%, rgba(165,130,250,0.18) 0%, transparent 55%)",
-        ].join(", ")
+        ].join(", "),
       }}
     >
-      <div 
-        className="w-full max-w-md rounded-2xl p-8"
-        style={{
-          background: "rgba(255,255,255,0.85)",
-          border: "1px solid rgba(255,255,255,0.95)",
-          boxShadow: [
-            "0 4px 16px rgba(124,58,237,0.10)",
-            "0 12px 48px rgba(124,58,237,0.08)",
-            "inset 0 1px 0 rgba(255,255,255,1)",
-          ].join(", "),
-          backdropFilter: "blur(20px)",
-        }}
-      >
-        {/* ---------------------------------------------------------------- */}
-        {/* Header                                                            */}
-        {/* ---------------------------------------------------------------- */}
-        <div className="mb-8 text-center">
-          <div 
-            className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl"
-            style={{
-              background: "linear-gradient(135deg, #7c3aed, #a855f7)",
-              boxShadow: "0 4px 20px rgba(124,58,237,0.40), inset 0 1px 0 rgba(255,255,255,0.25)",
-            }}
-          >
-            {/* ForgotPassword icon: speech bubble with padlock + asterisks */}
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="-12 -12 536 536" stroke="currentColor" strokeWidth={22} strokeLinecap="round" strokeLinejoin="round">
-              {/* Speech bubble — all edges expanded 12 SVG units outward */}
-              <path d="M43 6 H469 A55 55 0 0 1 524 61 V391 A55 55 0 0 1 469 446 H268 L225 504 L225 446 H43 A55 55 0 0 1 -12 391 V61 A55 55 0 0 1 43 6 Z" />
-              {/* Lock shackle — moved up another 16 units */}
-              <path d="M198 160 V120 A58 58 0 0 1 314 120 V160" strokeWidth={20} />
-              {/* Lock body — moved up another 16 units */}
-              <rect x="170" y="160" width="172" height="118" rx="16" />
-              {/* Keyhole slot — moved up another 16 units */}
-              <line x1="256" y1="194" x2="256" y2="240" strokeWidth={16} />
-              {/* 4 asterisks — moved down 4 SVG units (~0.25px) */}
-              <line x1="110" y1="329" x2="110" y2="379" /><line x1="87" y1="338" x2="133" y2="370" /><line x1="133" y1="338" x2="87" y2="370" />
-              <line x1="202" y1="329" x2="202" y2="379" /><line x1="179" y1="338" x2="225" y2="370" /><line x1="225" y1="338" x2="179" y2="370" />
-              <line x1="310" y1="329" x2="310" y2="379" /><line x1="287" y1="338" x2="333" y2="370" /><line x1="333" y1="338" x2="287" y2="370" />
-              <line x1="402" y1="329" x2="402" y2="379" /><line x1="379" y1="338" x2="425" y2="370" /><line x1="425" y1="338" x2="379" y2="370" />
-            </svg>
+      <div className="flex w-full max-w-5xl overflow-hidden rounded-[2rem] shadow-xl" style={{ minHeight: "600px" }}>
+
+        {/* LEFT — purple branding panel */}
+        <div className="relative hidden w-1/2 flex-col bg-[#7C3AED] p-10 text-white md:flex">
+          <div className="absolute -left-8 -top-8 h-40 w-40 rotate-12 rounded-3xl bg-white/10 backdrop-blur-sm" />
+          <div className="absolute -right-6 top-16 h-28 w-28 -rotate-12 rounded-3xl bg-white/10 backdrop-blur-sm" />
+          <div className="absolute bottom-24 -left-6 h-24 w-24 rotate-45 rounded-2xl bg-white/10 backdrop-blur-sm" />
+          <div className="absolute -bottom-8 right-12 h-36 w-36 -rotate-6 rounded-3xl bg-white/10 backdrop-blur-sm" />
+          <div className="absolute right-1/3 top-1/3 h-16 w-16 rotate-12 rounded-2xl bg-white/10 backdrop-blur-sm" />
+
+          <div className="relative z-10 flex items-center gap-2">
+            <img src="/logo.png" alt="BudgetBuddy" className="h-8 w-8 rounded-lg object-contain" />
+            <span className="text-sm font-semibold tracking-wide">BudgetBuddy</span>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">
-            Reset your password
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {success
-              ? "We've sent you an email"
-              : "Enter your email address and we'll send you a reset link"}
-          </p>
+
+          <div className="relative z-10 mt-auto pb-8">
+            <h1 className="text-4xl font-extrabold leading-tight">
+              Reset Your<br />Password .!
+            </h1>
+            <p className="mt-4 text-sm leading-relaxed text-white/75">
+              We&apos;ll send a secure link straight to your inbox.
+            </p>
+          </div>
         </div>
 
-        {/* ---------------------------------------------------------------- */}
-        {/* Success or Form Content                                           */}
-        {/* ---------------------------------------------------------------- */}
-        {success ? (
-          // Success state
-          <div className="space-y-6">
-            <div className="rounded-lg border border-primary/40 bg-primary/10 p-4">
-              <p className="text-sm text-center text-foreground">
-                Check your inbox for a reset link. If you don't see it, check your spam folder.
-              </p>
+        {/* RIGHT — glassmorphic form panel */}
+        <div
+          className="flex w-full flex-col justify-center px-8 py-10 md:w-1/2"
+          style={{
+            background: "rgba(255,255,255,0.85)",
+            border: "1px solid rgba(255,255,255,0.95)",
+            backdropFilter: "blur(20px)",
+          }}
+        >
+          {/* Header */}
+          <div className="mb-8 text-center">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#7C3AED]">
+              <svg className="h-6 w-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
             </div>
-
-            <Link
-              to="/login"
-              className="block w-full rounded-lg border border-input bg-background px-4 py-2.5 text-center text-sm font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-            >
-              Back to Login
-            </Link>
+            <h2 className="text-2xl font-bold text-gray-900">Reset password</h2>
+            <p className="mt-1 text-sm text-gray-500">
+              {success ? "We've sent you an email" : "Enter your email and we'll send you a reset link"}
+            </p>
           </div>
-        ) : (
-          // Form state
-          <form onSubmit={handleResetPassword} noValidate className="space-y-4">
-            {/* Error message */}
-            {error && (
-              <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3">
-                <p className="text-sm text-destructive">{error}</p>
+
+          {success ? (
+            <div className="space-y-5">
+              <div className="rounded-xl border border-[#7C3AED]/30 bg-[#7C3AED]/10 px-4 py-4">
+                <p className="text-center text-sm text-gray-700">
+                  Check your inbox for a reset link. If you don&apos;t see it, check your spam folder.
+                </p>
               </div>
-            )}
-
-            {/* Email input */}
-            <div className="space-y-1.5">
-              <label
-                htmlFor="email"
-                className="block text-sm font-medium text-foreground"
-              >
-                Email address
-              </label>
-              <input
-                id="email"
-                type="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                disabled={isLoading}
-                className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50"
-              />
-            </div>
-
-            {/* Submit button */}
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {isLoading ? "Sending..." : "Send reset link"}
-            </button>
-
-            {/* Back to login link */}
-            <div className="text-center">
               <Link
                 to="/login"
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors underline-offset-4 hover:underline"
+                className="block w-full rounded-xl bg-[#7C3AED] py-2.5 text-center text-sm font-semibold text-white transition-opacity hover:opacity-90"
               >
                 Back to Login
               </Link>
             </div>
-          </form>
-        )}
+          ) : (
+            <form onSubmit={handleResetPassword} noValidate className="space-y-4">
+              {error && (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+                  <p className="text-sm text-red-600">{error}</p>
+                </div>
+              )}
+
+              <div className="space-y-1.5">
+                <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                  Email address
+                </label>
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 7 9.5 6.5a1 1 0 0 0 1 0L22 7"/>
+                    </svg>
+                  </span>
+                  <input
+                    id="email"
+                    type="email"
+                    autoComplete="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    disabled={isLoading}
+                    className="w-full rounded-xl border border-gray-200 py-2.5 pl-10 pr-4 text-sm text-gray-900 placeholder:text-gray-400 focus:border-[#7C3AED] focus:outline-none focus:ring-1 focus:ring-[#7C3AED] disabled:opacity-50"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full rounded-xl bg-[#7C3AED] py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isLoading ? "Sending…" : "Send reset link"}
+              </button>
+
+              <p className="text-center">
+                <Link to="/login" className="text-sm font-medium text-[#7C3AED] hover:underline">
+                  Back to Login
+                </Link>
+              </p>
+            </form>
+          )}
+
+          <p className="mt-auto pt-8 text-center text-sm text-gray-500">
+            Don&apos;t have an account?{" "}
+            <Link to="/register" className="font-semibold text-[#7C3AED] hover:underline">
+              Create one
+            </Link>
+          </p>
+        </div>
       </div>
     </div>
   );
