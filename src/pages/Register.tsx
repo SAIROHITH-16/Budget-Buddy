@@ -286,7 +286,15 @@ export default function Register() {
               boxShadow: "0 4px 20px rgba(124,58,237,0.40), inset 0 1px 0 rgba(255,255,255,0.25)",
             }}
           >
-            <img src="/logo.png" alt="Budget Buddy" className="h-8 w-8 rounded object-contain" />
+            {/* Signup icon: person in circle with + badge */}
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <circle cx="10" cy="9" r="2.5" />
+              <path d="M5.5 19c0-2.5 2-4 4.5-4h1" />
+              <circle cx="17" cy="17" r="3" fill="none" />
+              <line x1="17" y1="15.5" x2="17" y2="18.5" />
+              <line x1="15.5" y1="17" x2="18.5" y2="17" />
+            </svg>
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">
             Create your account

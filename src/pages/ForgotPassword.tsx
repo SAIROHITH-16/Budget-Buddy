@@ -93,7 +93,16 @@ export default function ForgotPassword() {
               boxShadow: "0 4px 20px rgba(124,58,237,0.40), inset 0 1px 0 rgba(255,255,255,0.25)",
             }}
           >
-            <img src="/logo.png" alt="Budget Buddy" className="h-8 w-8 rounded object-contain" />
+            {/* ForgotPassword icon: shield with lock + asterisks */}
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2l7 3v5c0 4.5-3 8.5-7 10C5 18.5 2 14.5 2 10V5l7-3z" />
+              <rect x="9" y="9" width="6" height="5" rx="1" />
+              <path d="M10 9V7.5a2 2 0 1 1 4 0V9" />
+              <line x1="8.5" y1="16.5" x2="8.5" y2="16.5" strokeWidth={2.5} />
+              <line x1="11" y1="16.5" x2="11" y2="16.5" strokeWidth={2.5} />
+              <line x1="13.5" y1="16.5" x2="13.5" y2="16.5" strokeWidth={2.5} />
+              <line x1="16" y1="16.5" x2="16" y2="16.5" strokeWidth={2.5} />
+            </svg>
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">
             Reset your password
