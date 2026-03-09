@@ -287,16 +287,16 @@ export default function Register() {
             }}
           >
             {/* Signup icon: person silhouette + circle-plus badge bottom-right */}
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 512 512" stroke="currentColor" strokeWidth={30} strokeLinecap="round" strokeLinejoin="round">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
               {/* Head */}
-              <circle cx="195" cy="155" r="115" />
+              <circle cx="10" cy="8" r="5" />
               {/* Shoulder arc */}
-              <path d="M 48 490 A 210 210 0 0 1 310 360" fill="none" />
-              {/* + badge circle */}
-              <circle cx="385" cy="368" r="108" />
-              {/* + lines */}
-              <line x1="385" y1="300" x2="385" y2="436" />
-              <line x1="317" y1="368" x2="453" y2="368" />
+              <path d="M2 21a10 10 0 0 1 13.5-5.5" />
+              {/* Plus badge circle */}
+              <circle cx="19.5" cy="19" r="3.8" />
+              {/* Plus */}
+              <line x1="19.5" y1="16.8" x2="19.5" y2="21.2" />
+              <line x1="17.3" y1="19" x2="21.7" y2="19" />
             </svg>
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">
