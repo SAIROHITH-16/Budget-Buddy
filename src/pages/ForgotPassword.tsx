@@ -97,12 +97,12 @@ export default function ForgotPassword() {
             <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="-12 -12 536 536" stroke="currentColor" strokeWidth={22} strokeLinecap="round" strokeLinejoin="round">
               {/* Speech bubble — all edges expanded 12 SVG units outward */}
               <path d="M43 6 H469 A55 55 0 0 1 524 61 V391 A55 55 0 0 1 469 446 H268 L225 504 L225 446 H43 A55 55 0 0 1 -12 391 V61 A55 55 0 0 1 43 6 Z" />
-              {/* Lock shackle */}
-              <path d="M198 176 V136 A58 58 0 0 1 314 136 V176" strokeWidth={20} />
-              {/* Lock body */}
-              <rect x="170" y="176" width="172" height="118" rx="16" />
-              {/* Keyhole slot */}
-              <line x1="256" y1="210" x2="256" y2="256" strokeWidth={16} />
+              {/* Lock shackle — moved up another 16 units */}
+              <path d="M198 160 V120 A58 58 0 0 1 314 120 V160" strokeWidth={20} />
+              {/* Lock body — moved up another 16 units */}
+              <rect x="170" y="160" width="172" height="118" rx="16" />
+              {/* Keyhole slot — moved up another 16 units */}
+              <line x1="256" y1="194" x2="256" y2="240" strokeWidth={16} />
               {/* 4 asterisks — moved down 4 SVG units (~0.25px) */}
               <line x1="110" y1="329" x2="110" y2="379" /><line x1="87" y1="338" x2="133" y2="370" /><line x1="133" y1="338" x2="87" y2="370" />
               <line x1="202" y1="329" x2="202" y2="379" /><line x1="179" y1="338" x2="225" y2="370" /><line x1="225" y1="338" x2="179" y2="370" />
