@@ -283,7 +283,7 @@ export function ColumnMapper({
         {" — "}{rawCsvData.length} rows, {headers.length} columns detected.
       </div>
 
-      {/* ── Column mapping dropdowns ── */}
+      {/* Column mapping dropdowns */}
       <div>
         <p className="text-sm font-semibold mb-3">Map columns to database fields</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -327,7 +327,7 @@ export function ColumnMapper({
         </p>
       </div>
 
-      {/* ── Live preview ── */}
+      {/* Live preview */}
       {canConfirm && (
         <div>
           <p className="text-xs text-muted-foreground mb-2">
@@ -369,7 +369,7 @@ export function ColumnMapper({
         </div>
       )}
 
-      {/* ── Actions ── */}
+      {/* Actions */}
       <div className="flex items-center justify-between pt-1">
         {onBack ? (
           <Button variant="ghost" size="sm" onClick={onBack}>

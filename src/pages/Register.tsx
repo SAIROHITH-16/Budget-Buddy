@@ -320,6 +320,7 @@ export default function Register() {
   // Render
   // -------------------------------------------------------------------------
   return (
+    <>
     <div
       className="flex min-h-screen items-center justify-center bg-transparent p-4"
       style={{
@@ -573,7 +574,7 @@ export default function Register() {
       </div>
     </div>
 
-    {/* ── Phone number dialog (shown after Google sign-up) ────────────── */}
+    {/* Phone number dialog (shown after Google sign-up) */}
     <Dialog open={showPhoneDialog} onOpenChange={() => {}}>
       <DialogContent
         className="sm:max-w-md"
@@ -652,7 +653,7 @@ export default function Register() {
       </DialogContent>
     </Dialog>
 
-    {/* ── Currency dialog (shown after phone dialog) ───────────────────── */}
+    {/* Currency dialog (shown after phone dialog) */}
     <Dialog open={showCurrencyDialog} onOpenChange={() => {}}>
       <DialogContent
         className="sm:max-w-md"
@@ -737,5 +738,6 @@ export default function Register() {
         </Button>
       </DialogContent>
     </Dialog>
+    </>
   );
 }

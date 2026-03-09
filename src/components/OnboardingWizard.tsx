@@ -163,7 +163,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       {/* Card */}
       <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl overflow-hidden">
 
-        {/* ── Purple header ── */}
+        {/* Purple header */}
         <div className="bg-[#7C3AED] px-8 py-6 text-white">
           <div className="flex items-center gap-3">
             {step === 1
@@ -181,10 +181,10 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
           </div>
         </div>
 
-        {/* ── Body ── */}
+        {/* Body */}
         <div className="px-8 py-7 space-y-5">
 
-          {/* ════════ STEP 1 — Phone ════════ */}
+          {/* STEP 1 - Phone */}
           {step === 1 && (
             <>
               <p className="text-sm text-gray-500 leading-relaxed">
@@ -271,7 +271,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
             </>
           )}
 
-          {/* ════════ STEP 2 — Currency ════════ */}
+          {/* STEP 2 - Currency */}
           {step === 2 && (
             <>
               <p className="text-sm text-gray-500 leading-relaxed">

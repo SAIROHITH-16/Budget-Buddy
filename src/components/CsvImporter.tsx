@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+﻿import { useState, useRef, useCallback } from "react";
 import Papa from "papaparse";
 import { Upload, FileText, X, AlertCircle, CheckCircle2, Loader2, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -340,7 +340,7 @@ export function CsvImporter({ onComplete, onClose }: CsvImporterProps) {
             </div>
           )}
 
-          {/* ── Password prompt for encrypted PDFs ───────────────────────── */}
+          {/* Password prompt for encrypted PDFs */}
           {needsPassword && (
             <div className="rounded-xl border backdrop-blur-xl p-4 space-y-3" style={{ background: 'rgba(255,255,255,0.85)', border: '1px solid rgba(124,58,237,0.20)' }}>
               <p className="flex items-center gap-2 text-slate-800 text-sm font-semibold">
@@ -374,7 +374,7 @@ export function CsvImporter({ onComplete, onClose }: CsvImporterProps) {
         </>
       )}
 
-      {/* ── Step 2: Column mapping (delegated to ColumnMapper) ─────────────── */}
+      {/* Step 2: Column mapping (delegated to ColumnMapper) */}
       {step === "map" && (
         <>
           {/* File badge with reset */}
@@ -410,7 +410,7 @@ export function CsvImporter({ onComplete, onClose }: CsvImporterProps) {
         </>
       )}
 
-      {/* ── Step 3: Result summary ─────────────────────────────────────────── */}
+      {/* Step 3: Result summary */}
       {step === "result" && result && (
         <div className="space-y-3">
           <div className="flex items-start gap-3 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-emerald-400">

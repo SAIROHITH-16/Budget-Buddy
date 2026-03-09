@@ -232,7 +232,7 @@ export function PhoneSettings() {
           </div>
         )}
 
-        {/* ── Step 1 — phone input ─────────────────────────────────────── */}
+        {/* Step 1 - phone input */}
         {step === 1 && (
           <div className="space-y-4">
             <div className="space-y-1.5">
@@ -289,7 +289,7 @@ export function PhoneSettings() {
           </div>
         )}
 
-        {/* ── Step 2 — OTP input ──────────────────────────────────────── */}
+        {/* Step 2 - OTP input */}
         {step === 2 && (
           <div className="space-y-4">
             <div className="space-y-1.5">
@@ -341,7 +341,7 @@ export function PhoneSettings() {
           </div>
         )}
 
-        {/* Invisible reCAPTCHA mount point — must be in the DOM at all times */}
+        {/* Invisible reCAPTCHA mount point - must be in the DOM at all times */}
         <div id="recaptcha-container-phone-settings" />
       </CardContent>
     </Card>
