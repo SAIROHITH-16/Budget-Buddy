@@ -296,9 +296,9 @@ export default function Register() {
               <circle cx="12.5" cy="9" r="3" />
               {/* Shoulders arc — shifted right by +1.5 */}
               <path d="M8 18 A5 5 0 0 1 17 18" fill="none" />
-              {/* Plus sign — shifted right by +1.5 */}
-              <line x1="20.5" y1="17" x2="20.5" y2="22" />
-              <line x1="18" y1="19.5" x2="23" y2="19.5" />
+              {/* Plus sign — moved down by 1 */}
+              <line x1="20.5" y1="18" x2="20.5" y2="23" />
+              <line x1="18" y1="20.5" x2="23" y2="20.5" />
             </svg>
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">
