@@ -153,7 +153,7 @@ export default function Login() {
         {/* ---------------------------------------------------------------- */}
         {/* LEFT — blue branding panel                                        */}
         {/* ---------------------------------------------------------------- */}
-        <div className="relative hidden w-1/2 flex-col bg-[#2B52F5] p-10 text-white md:flex">
+        <div className="relative hidden w-1/2 flex-col bg-[#7C3AED] p-10 text-white md:flex">
 
           {/* Decorative floating shapes */}
           <div className="absolute -left-8 -top-8 h-40 w-40 rotate-12 rounded-3xl bg-white/10 backdrop-blur-sm" />
@@ -198,7 +198,7 @@ export default function Login() {
           {/* Header */}
           <div className="mb-8 text-center">
             {/* App logo mark */}
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#2B52F5]">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#7C3AED]">
               <svg className="h-6 w-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="2" y="5" width="20" height="14" rx="2"/>
                 <path d="M2 10h20"/>
@@ -238,7 +238,7 @@ export default function Login() {
                   required
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
-                  className="w-full rounded-xl border border-gray-200 py-2.5 pl-10 pr-4 text-sm text-gray-900 placeholder:text-gray-400 focus:border-[#2B52F5] focus:outline-none focus:ring-1 focus:ring-[#2B52F5] disabled:opacity-50"
+                  className="w-full rounded-xl border border-gray-200 py-2.5 pl-10 pr-4 text-sm text-gray-900 placeholder:text-gray-400 focus:border-[#7C3AED] focus:outline-none focus:ring-1 focus:ring-[#7C3AED] disabled:opacity-50"
                   placeholder="you@example.com or +1 234 567 8900"
                   disabled={isSubmitting || isGoogleSubmitting}
                 />
@@ -265,7 +265,7 @@ export default function Login() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full rounded-xl border border-gray-200 py-2.5 pl-10 pr-10 text-sm text-gray-900 placeholder:text-gray-400 focus:border-[#2B52F5] focus:outline-none focus:ring-1 focus:ring-[#2B52F5] disabled:opacity-50"
+                  className="w-full rounded-xl border border-gray-200 py-2.5 pl-10 pr-10 text-sm text-gray-900 placeholder:text-gray-400 focus:border-[#7C3AED] focus:outline-none focus:ring-1 focus:ring-[#7C3AED] disabled:opacity-50"
                   placeholder="••••••••"
                   disabled={isSubmitting || isGoogleSubmitting}
                 />
@@ -282,7 +282,7 @@ export default function Login() {
               {/* Forgot password */}
               <Link
                 to="/forgot-password"
-                className="block text-xs font-medium text-[#2B52F5] hover:underline"
+                className="block text-xs font-medium text-[#7C3AED] hover:underline"
               >
                 Forgot password?
               </Link>
@@ -292,7 +292,7 @@ export default function Login() {
             <button
               type="submit"
               disabled={isSubmitting || isGoogleSubmitting}
-              className="mt-2 w-full rounded-xl bg-[#2B52F5] py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+              className="mt-2 w-full rounded-xl bg-[#7C3AED] py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isSubmitting ? "Signing in…" : "Login"}
             </button>
@@ -322,16 +322,6 @@ export default function Login() {
                 <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
               </svg>
             </button>
-            {/* Facebook */}
-            <button
-              type="button"
-              title="Continue with Facebook"
-              className="flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white transition-colors hover:bg-gray-50"
-            >
-              <svg className="h-4 w-4 fill-[#1877F2]" viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M24 12.073C24 5.405 18.627 0 12 0S0 5.405 0 12.073C0 18.1 4.388 23.094 10.125 24v-8.437H7.078v-3.49h3.047V9.41c0-3.025 1.792-4.697 4.533-4.697 1.312 0 2.686.235 2.686.235v2.97h-1.513c-1.491 0-1.956.93-1.956 1.886v2.256h3.328l-.532 3.49h-2.796V24C19.612 23.094 24 18.1 24 12.073z"/>
-              </svg>
-            </button>
             {/* Phone */}
             <Link
               to="/phone-signin"
@@ -347,7 +337,7 @@ export default function Login() {
           {/* Footer */}
           <p className="mt-auto pt-8 text-center text-sm text-gray-500">
             Don&apos;t have an account?{" "}
-            <Link to="/register" className="font-semibold text-[#2B52F5] hover:underline">
+            <Link to="/register" className="font-semibold text-[#7C3AED] hover:underline">
               Create one
             </Link>
           </p>
