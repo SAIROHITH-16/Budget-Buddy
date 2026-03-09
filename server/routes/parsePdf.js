@@ -19,12 +19,19 @@
 
 const express  = require("express");
 const multer   = require("multer");
-
-// pdf-parse v2.x exports as default, so we need to handle both CommonJS and ES module styles
-const pdfParseModule = require("pdf-parse");
-const pdfParse = pdfParseModule.default || pdfParseModule;
-
 const verifyToken = require("../middleware/verifyToken");
+
+// ---------------------------------------------------------------------------
+// Lazy-load pdf-parse to avoid DOMMatrix/ImageData/Path2D polyfill warnings
+// at server startup.  The lib/ entry point is used rather than the default
+// dist/cjs build, which tries to set up browser DOM globals on import.
+// ---------------------------------------------------------------------------
+function getPdfParse() {
+  // pdf-parse/lib/pdf-parse.js is the raw implementation file that does NOT
+  // run the browser-environment setup code in the dist build.
+  const mod = require("pdf-parse/lib/pdf-parse.js");
+  return mod.default || mod;
+}
 
 const router = express.Router();
 
@@ -228,6 +235,7 @@ router.post(
     }
 
     try {
+      const pdfParse = getPdfParse();
       const data = await pdfParse(req.file.buffer);
       const text = data.text;
 
