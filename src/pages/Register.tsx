@@ -16,7 +16,7 @@ import { type FirebaseError } from "firebase/app";
 import { updateProfile, signInWithCustomToken, auth } from "@/firebase";
 import { sendEmailVerification } from "firebase/auth";
 import api from "@/api";
-import { Phone } from "lucide-react";
+import { Phone, DollarSign, Check } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -116,6 +116,10 @@ export default function Register() {
   const [dialogPhoneSaving, setDialogPhoneSaving] = useState<boolean>(false);
   const [googleUid, setGoogleUid] = useState<string>("");
   const [googleEmail, setGoogleEmail] = useState<string>("");
+
+  // Currency dialog (shown after phone dialog)
+  const [showCurrencyDialog, setShowCurrencyDialog] = useState<boolean>(false);
+  const [selectedCurrency, setSelectedCurrency] = useState<string>("USD");
 
   // -------------------------------------------------------------------------
   // Phone.Email handler — called by the global listener once the user verifies
@@ -253,7 +257,7 @@ export default function Register() {
   }
 
   // -------------------------------------------------------------------------
-  // Google sign-up handler — opens phone dialog, then forces currency setup
+  // Google sign-up handler — opens phone dialog, currency dialog follows
   // -------------------------------------------------------------------------
   async function handleGoogleSignUp(): Promise<void> {
     setErrorMessage(null);
@@ -263,9 +267,7 @@ export default function Register() {
       const user = credential.user;
       setGoogleUid(user.uid);
       setGoogleEmail(user.email ?? "");
-      // Always force currency setup for Google sign-ins
-      localStorage.setItem("showCurrencySetup", "true");
-      // Show phone number dialog before proceeding to dashboard
+      // Show phone number dialog — currency dialog will follow
       setShowPhoneDialog(true);
     } catch (err) {
       setErrorMessage(parseFirebaseError(err));
@@ -275,7 +277,7 @@ export default function Register() {
   }
 
   // -------------------------------------------------------------------------
-  // Phone dialog — save phone then go to dashboard (currency dialog auto-opens)
+  // Phone dialog — save phone then open currency dialog
   // -------------------------------------------------------------------------
   async function handleDialogSavePhone(): Promise<void> {
     setDialogPhoneSaving(true);
@@ -287,16 +289,27 @@ export default function Register() {
         phone: fullPhone,
       });
     } catch {
-      // Non-fatal — proceed to dashboard regardless
+      // Non-fatal — proceed regardless
     } finally {
       setDialogPhoneSaving(false);
     }
     setShowPhoneDialog(false);
-    navigate("/dashboard", { replace: true });
+    setShowCurrencyDialog(true);
   }
 
+  // Skip phone — still must choose currency
   function handleDialogSkip(): void {
     setShowPhoneDialog(false);
+    setShowCurrencyDialog(true);
+  }
+
+  // -------------------------------------------------------------------------
+  // Currency dialog — save currency then go to dashboard
+  // -------------------------------------------------------------------------
+  function handleCurrencySave(): void {
+    localStorage.setItem("preferredCurrency", selectedCurrency);
+    window.dispatchEvent(new CustomEvent("currencyChange", { detail: selectedCurrency }));
+    setShowCurrencyDialog(false);
     navigate("/dashboard", { replace: true });
   }
 
@@ -633,6 +646,92 @@ export default function Register() {
           className="w-full"
         >
           Skip for now
+        </Button>
+      </DialogContent>
+    </Dialog>
+
+    {/* ── Currency dialog (shown after phone dialog) ───────────────────── */}
+    <Dialog open={showCurrencyDialog} onOpenChange={() => {}}>
+      <DialogContent
+        className="sm:max-w-md"
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+      >
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-xl">
+            <DollarSign className="h-6 w-6 text-primary" />
+            Welcome! Choose Your Currency
+          </DialogTitle>
+          <DialogDescription className="text-base pt-2">
+            Select your preferred currency for displaying amounts throughout
+            the app. You can change this later in Settings.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="reg-currency-select">Currency</Label>
+            <Select value={selectedCurrency} onValueChange={setSelectedCurrency}>
+              <SelectTrigger id="reg-currency-select">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="max-h-[300px]">
+                {[
+                  { code: "USD", symbol: "$",    name: "US Dollar" },
+                  { code: "EUR", symbol: "€",    name: "Euro" },
+                  { code: "GBP", symbol: "£",    name: "British Pound" },
+                  { code: "JPY", symbol: "¥",    name: "Japanese Yen" },
+                  { code: "CNY", symbol: "¥",    name: "Chinese Yuan" },
+                  { code: "INR", symbol: "₹",    name: "Indian Rupee" },
+                  { code: "AUD", symbol: "A$",   name: "Australian Dollar" },
+                  { code: "CAD", symbol: "C$",   name: "Canadian Dollar" },
+                  { code: "CHF", symbol: "CHF",  name: "Swiss Franc" },
+                  { code: "SEK", symbol: "kr",   name: "Swedish Krona" },
+                  { code: "NZD", symbol: "NZ$",  name: "New Zealand Dollar" },
+                  { code: "KRW", symbol: "₩",    name: "South Korean Won" },
+                  { code: "SGD", symbol: "S$",   name: "Singapore Dollar" },
+                  { code: "HKD", symbol: "HK$",  name: "Hong Kong Dollar" },
+                  { code: "MXN", symbol: "Mex$", name: "Mexican Peso" },
+                  { code: "BRL", symbol: "R$",   name: "Brazilian Real" },
+                  { code: "ZAR", symbol: "R",    name: "South African Rand" },
+                  { code: "RUB", symbol: "₽",    name: "Russian Ruble" },
+                  { code: "TRY", symbol: "₺",    name: "Turkish Lira" },
+                  { code: "AED", symbol: "د.إ",  name: "UAE Dirham" },
+                ].map((c) => (
+                  <SelectItem key={c.code} value={c.code}>
+                    {c.symbol} - {c.name} ({c.code})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="rounded-lg bg-muted/50 p-3 text-sm text-muted-foreground">
+            <p className="font-medium text-foreground mb-1">Preview:</p>
+            <p>
+              All amounts will be displayed as{" "}
+              <span className="font-semibold text-foreground">
+                {[
+                  { code: "USD", symbol: "$" }, { code: "EUR", symbol: "€" },
+                  { code: "GBP", symbol: "£" }, { code: "JPY", symbol: "¥" },
+                  { code: "CNY", symbol: "¥" }, { code: "INR", symbol: "₹" },
+                  { code: "AUD", symbol: "A$" }, { code: "CAD", symbol: "C$" },
+                  { code: "CHF", symbol: "CHF" }, { code: "SEK", symbol: "kr" },
+                  { code: "NZD", symbol: "NZ$" }, { code: "KRW", symbol: "₩" },
+                  { code: "SGD", symbol: "S$" }, { code: "HKD", symbol: "HK$" },
+                  { code: "MXN", symbol: "Mex$" }, { code: "BRL", symbol: "R$" },
+                  { code: "ZAR", symbol: "R" }, { code: "RUB", symbol: "₽" },
+                  { code: "TRY", symbol: "₺" }, { code: "AED", symbol: "د.إ" },
+                ].find((c) => c.code === selectedCurrency)?.symbol ?? "$"}
+                1,234.56
+              </span>
+            </p>
+          </div>
+        </div>
+
+        <Button onClick={handleCurrencySave} className="w-full" size="lg">
+          <Check className="h-5 w-5 mr-2" />
+          Continue with {selectedCurrency}
         </Button>
       </DialogContent>
     </Dialog>
