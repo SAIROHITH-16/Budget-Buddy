@@ -93,25 +93,21 @@ export default function ForgotPassword() {
               boxShadow: "0 4px 20px rgba(124,58,237,0.40), inset 0 1px 0 rgba(255,255,255,0.25)",
             }}
           >
-            {/* ForgotPassword icon: shield with padlock + asterisk row */}
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 64 64" stroke="currentColor" strokeWidth={3.2} strokeLinecap="round" strokeLinejoin="round">
-              {/* Shield */}
-              <path d="M32 4 L58 13 L58 32 C58 47 46 58 32 62 C18 58 6 47 6 32 L6 13 Z" />
-              {/* Lock body */}
-              <rect x="22" y="28" width="20" height="16" rx="3" />
+            {/* ForgotPassword icon: speech bubble with padlock + asterisks */}
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 64 64" stroke="currentColor" strokeWidth={3.5} strokeLinecap="round" strokeLinejoin="round">
+              {/* Speech bubble body */}
+              <path d="M8 6 H56 A6 6 0 0 1 62 12 V42 A6 6 0 0 1 56 48 H36 L28 58 L28 48 H8 A6 6 0 0 1 2 42 V12 A6 6 0 0 1 8 6 Z" />
               {/* Lock shackle */}
-              <path d="M26 28 L26 23 A6 6 0 0 1 38 23 L38 28" />
-              {/* Keyhole dot */}
-              <line x1="32" y1="33" x2="32" y2="38" strokeWidth={2.5} />
-              {/* Asterisks row */}
-              {/* asterisk 1 */}
-              <line x1="16" y1="50" x2="16" y2="56" /><line x1="13" y1="51.5" x2="19" y2="54.5" /><line x1="19" y1="51.5" x2="13" y2="54.5" />
-              {/* asterisk 2 */}
-              <line x1="24" y1="50" x2="24" y2="56" /><line x1="21" y1="51.5" x2="27" y2="54.5" /><line x1="27" y1="51.5" x2="21" y2="54.5" />
-              {/* asterisk 3 */}
-              <line x1="40" y1="50" x2="40" y2="56" /><line x1="37" y1="51.5" x2="43" y2="54.5" /><line x1="43" y1="51.5" x2="37" y2="54.5" />
-              {/* asterisk 4 */}
-              <line x1="48" y1="50" x2="48" y2="56" /><line x1="45" y1="51.5" x2="51" y2="54.5" /><line x1="51" y1="51.5" x2="45" y2="54.5" />
+              <path d="M26 26 L26 21 A6 6 0 0 1 38 21 L38 26" />
+              {/* Lock body */}
+              <rect x="22" y="26" width="20" height="15" rx="3" />
+              {/* Keyhole */}
+              <line x1="32" y1="31" x2="32" y2="36" strokeWidth={2.5} />
+              {/* Asterisks */}
+              <line x1="14" y1="44" x2="14" y2="50" strokeWidth={3} /><line x1="11" y1="45.5" x2="17" y2="48.5" strokeWidth={3} /><line x1="17" y1="45.5" x2="11" y2="48.5" strokeWidth={3} />
+              <line x1="24" y1="44" x2="24" y2="50" strokeWidth={3} /><line x1="21" y1="45.5" x2="27" y2="48.5" strokeWidth={3} /><line x1="27" y1="45.5" x2="21" y2="48.5" strokeWidth={3} />
+              <line x1="40" y1="44" x2="40" y2="50" strokeWidth={3} /><line x1="37" y1="45.5" x2="43" y2="48.5" strokeWidth={3} /><line x1="43" y1="45.5" x2="37" y2="48.5" strokeWidth={3} />
+              <line x1="50" y1="44" x2="50" y2="50" strokeWidth={3} /><line x1="47" y1="45.5" x2="53" y2="48.5" strokeWidth={3} /><line x1="53" y1="45.5" x2="47" y2="48.5" strokeWidth={3} />
             </svg>
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">
