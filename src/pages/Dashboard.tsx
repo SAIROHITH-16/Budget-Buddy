@@ -210,7 +210,7 @@ const Dashboard = () => {
             <AlertTriangle className="h-4 w-4 shrink-0" />
             <p className="text-xs">
               Could not load data — make sure the backend server is running
-              (<code className="font-mono">npm run dev:full</code>).
+              (<code className="font-mono">npm run dev</code>).
             </p>
           </div>
         )}
