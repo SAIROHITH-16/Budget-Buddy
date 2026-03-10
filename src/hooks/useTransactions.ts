@@ -119,6 +119,10 @@ export function useTransactions(options: UseTransactionsOptions = {}) {
           ?.response?.data?.message ??
         (e as { message?: string })?.message ??
         "Failed to fetch transactions.";
+      console.error(
+        "[useTransactions] fetch failed:",
+        (e as { response?: { data?: unknown } })?.response?.data ?? (e as Error)?.message ?? e
+      );
       setError(msg);
     } finally {
       setLoading(false);

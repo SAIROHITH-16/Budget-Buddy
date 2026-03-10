@@ -125,24 +125,34 @@ api.interceptors.response.use(
     return response;
   },
 
-  // 3b. Error response — handle specific HTTP status codes
-  (error: AxiosError): Promise<never> => {
-    if (error.response) {
-      // The server responded with a status code outside 2xx
-      const { status, data } = error.response;
+  // 3b. Error response — handle specific HTTP status codes.
+  // On a 401, attempt a single automatic retry with a force-refreshed Firebase token
+  // (handles the case where the cached token expired between page load and first request).
+  async (error: AxiosError): Promise<AxiosResponse | never> => {
+    const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
-      if (status === 401) {
-        // Token missing, expired, or invalid.
-        // The server's verifyToken middleware sends this when auth fails.
-        console.warn(
-          "[api] 401 Unauthorised — Firebase token may be missing or expired. " +
-            "The user may need to sign in again."
-        );
-      } else if (status === 403) {
-        // Authenticated but not permitted to access this resource
+    if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
+      originalRequest._retry = true; // prevent infinite retry loop
+
+      const firebaseUser = auth.currentUser;
+      if (firebaseUser) {
+        try {
+          // Force a fresh token — bypasses Firebase's local cache
+          const freshToken = await firebaseUser.getIdToken(/* forceRefresh */ true);
+          originalRequest.headers["Authorization"] = `Bearer ${freshToken}`;
+          console.warn("[api] 401 received — retrying with force-refreshed Firebase token.");
+          return api(originalRequest);
+        } catch (refreshError) {
+          console.error("[api] Token force-refresh failed — user may need to sign in again:", refreshError);
+        }
+      } else {
+        console.warn("[api] 401 received — no active Firebase user. User may need to sign in.");
+      }
+    } else if (error.response) {
+      const { status, data } = error.response;
+      if (status === 403) {
         console.warn("[api] 403 Forbidden — user lacks permission for this resource.");
       } else if (status >= 500) {
-        // Server-side error
         console.error(`[api] Server error ${status}:`, data);
       }
     } else if (error.request) {
@@ -152,11 +162,10 @@ api.interceptors.response.use(
         import.meta.env.VITE_API_URL || "http://localhost:3001/api"
       );
     } else {
-      // Something went wrong setting up the request itself
-      console.error("[api] Request error:", error.message);
+      console.error("[api] Request setup error:", error.message);
     }
 
-    // Always re-throw so individual callers (hooks, pages) can handle the error
+    // Re-throw so individual callers (hooks, pages) can handle the error
     return Promise.reject(error);
   }
 );
