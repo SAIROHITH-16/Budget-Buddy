@@ -4,7 +4,9 @@
 
 "use strict";
 
-require("dotenv").config();
+// Load .env from the server directory regardless of the working directory
+// that launched this process (e.g. when run as `node server/index.js` from root).
+require("dotenv").config({ path: require("path").join(__dirname, ".env") });
 
 const express = require("express");
 const cors    = require("cors");

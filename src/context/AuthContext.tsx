@@ -30,6 +30,7 @@ import {
   subscribeToAuthChanges,
   auth,
 } from "@/firebase";
+import api from "@/api";
 
 // ---------------------------------------------------------------------------
 // 1. Shape of the context value
@@ -96,6 +97,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
           if (import.meta.env.DEV) {
             (window as any).__firebaseToken = token;
           }
+
+          // Sync user record to the backend DB on every sign-in.
+          // Fire-and-forget — never blocks the UI, never throws to the user.
+          api.post("/auth/firebase-login").catch(() => {});
         } catch (err) {
           console.error("[AuthContext] Failed to retrieve ID token:", err);
           setIdToken(null);

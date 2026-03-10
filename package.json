@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently -n SERVER,CLIENT -c cyan,green \"cd server && node index.js\" \"vite\"",
+    "dev": "concurrently -n SERVER,CLIENT -c cyan,green \"node server/index.js\" \"vite\"",
     "dev:client": "vite",
     "build": "vite build",
     "build:dev": "vite build --mode development",
