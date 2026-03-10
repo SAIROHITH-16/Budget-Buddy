@@ -204,7 +204,16 @@ const Dashboard = () => {
           </div>
         )}
 
-        {/* Network errors are intentionally silent — stat cards already show $0.00 */}
+        {/* Backend unreachable — show a non-blocking amber notice */}
+        {error && !loading && (
+          <div className="flex items-center gap-3 rounded-lg border border-amber-400/40 bg-amber-400/8 px-4 py-2.5 text-amber-600 dark:text-amber-400">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            <p className="text-xs">
+              Could not load data — make sure the backend server is running
+              (<code className="font-mono">npm run dev:full</code>).
+            </p>
+          </div>
+        )}
 
         {/* ------------------------------------------------------------------ */}
         {/* Stat cards                                                          */}
