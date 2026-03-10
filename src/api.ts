@@ -36,8 +36,12 @@ import { auth } from "@/firebase";
 function resolveBaseURL(): string {
   // 1. Explicit override (baked in at Vite build time) — highest priority.
   //    Set VITE_API_URL in Vercel / Railway / your CI environment.
+  //    The value must include the /api suffix, e.g. https://your-app.onrender.com/api
+  //    As a safety net, append /api automatically if it's missing.
   const envUrl = import.meta.env.VITE_API_URL;
-  if (envUrl) return envUrl;
+  if (envUrl) {
+    return envUrl.endsWith("/api") ? envUrl : envUrl.replace(/\/$/, "") + "/api";
+  }
 
   // 2. Development: the Vite dev server proxies /api → localhost:3001,
   //    so a relative path is all we need.
