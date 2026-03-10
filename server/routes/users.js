@@ -315,4 +315,45 @@ router.patch("/update-phone", verifyToken, (req, res) => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// PUT /api/users/setup
+// Called by the OnboardingWizard to save phone (step 1) or acknowledge
+// currency preference (step 2, stored client-side in localStorage).
+// Protected by verifyToken — requires valid Firebase JWT.
+//
+// Body: { phone?: string, currency?: string }
+// ---------------------------------------------------------------------------
+router.put("/setup", verifyToken, (req, res) => {
+  try {
+    const { phone, currency } = req.body;
+    const db  = getDb();
+    const now = new Date().toISOString();
+    const uid = req.user.uid;
+
+    const user = db.prepare("SELECT id FROM users WHERE firebase_uid = ?").get(uid);
+    if (!user) {
+      // Row not yet created — create a minimal one so subsequent updates work.
+      const { email, name: tokenName } = req.user;
+      const resolvedName  = tokenName || (email ? email.split("@")[0] : "User");
+      const resolvedEmail = email || null;
+      db.prepare(`
+        INSERT INTO users (id, firebase_uid, name, email, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(randomUUID(), uid, resolvedName, resolvedEmail, now, now);
+    }
+
+    if (phone && typeof phone === "string" && phone.trim().length >= 5) {
+      db.prepare(
+        "UPDATE users SET phone = ?, updated_at = ? WHERE firebase_uid = ?"
+      ).run(phone.trim(), now, uid);
+    }
+    // currency is stored client-side; backend simply acknowledges.
+
+    return res.status(200).json({ success: true, message: "Setup saved." });
+  } catch (err) {
+    console.error("[users] PUT /setup error:", err);
+    return res.status(500).json({ success: false, error: "Setup failed.", message: err.message });
+  }
+});
+
 module.exports = router;
