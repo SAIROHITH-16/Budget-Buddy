@@ -9,13 +9,34 @@ const fs             = require("fs");
 const { randomUUID } = require("crypto");
 
 // ── Storage setup ──────────────────────────────────────────────────────────
-// In production (Render), store the database on the mounted persistent disk
-// at /var/data so it survives redeploys and restarts.  In development, keep
-// it in the local server/data/ directory as before.
-const DATA_DIR = process.env.NODE_ENV === "production"
-  ? "/var/data"
-  : path.join(__dirname, "..", "data");
-if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+// Priority order for the data directory:
+//   1. DATA_DIR env var (explicit override)
+//   2. /var/data (Render persistent disk — only when actually mounted)
+//   3. server/data/ (always-writable local fallback)
+function resolveDataDir() {
+  const candidates = [
+    process.env.DATA_DIR,
+    process.env.NODE_ENV === "production" ? "/var/data" : null,
+    path.join(__dirname, "..", "data"),
+  ].filter(Boolean);
+
+  for (const dir of candidates) {
+    try {
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      // Verify write access
+      const probe = path.join(dir, ".write-probe");
+      fs.writeFileSync(probe, "ok");
+      fs.unlinkSync(probe);
+      console.log("[db] Data directory:", dir);
+      return dir;
+    } catch (err) {
+      console.warn("[db] Cannot use data directory:", dir, "—", err.message);
+    }
+  }
+  throw new Error("[db] No writable data directory available");
+}
+
+const DATA_DIR = resolveDataDir();
 
 const DB_PATH = path.join(DATA_DIR, "budget.db");
 
