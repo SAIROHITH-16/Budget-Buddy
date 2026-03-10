@@ -41,22 +41,29 @@ const ALLOWED_ORIGINS = new Set([
   ...(CORS_ORIGIN || "").split(",").map((o) => o.trim()).filter(Boolean),
 ]);
 
+// Matches any Vercel preview or branch deployment URL:
+//   https://<anything>.vercel.app
+const VERCEL_PREVIEW_RE = /^https:\/\/[\w-]+\.vercel\.app$/;
+
 app.use(cors({
   origin: (origin, cb) => {
     // Allow requests with no origin (curl/Postman/server-to-server)
     if (!origin) return cb(null, true);
     // Allow any local/LAN origin (development)
     if (LOCAL_ORIGIN_RE.test(origin)) return cb(null, true);
+    // Allow any Vercel preview/branch deployment
+    if (VERCEL_PREVIEW_RE.test(origin)) return cb(null, true);
     // Allow explicitly listed production origins
     if (ALLOWED_ORIGINS.has(origin)) return cb(null, true);
     // Reject everything else
-    console.warn(`[CORS] Blocked origin: ${origin}`);
+    console.warn(`[CORS] Blocked origin: ${origin} — add it to CORS_ORIGIN env var if legitimate`);
     cb(null, false);
   },
   methods:        ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
   credentials:    true,
 }));
+console.log("[CORS] Allowed origins:", [...ALLOWED_ORIGINS].join(", "), "+ all *.vercel.app + localhost");
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use((req, _res, next) => {

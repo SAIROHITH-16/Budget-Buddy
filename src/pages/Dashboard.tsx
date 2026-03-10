@@ -61,7 +61,9 @@ const Dashboard = () => {
     let cancelled = false;
     api.get<Budget>("/budget")
       .then(({ data }) => { if (!cancelled) setBudget(data); })
-      .catch(() => { /* silently ignore — no budget set yet */ });
+      .catch((error) => {
+        console.error("[Dashboard] Budget fetch error:", error.response?.data || error.message);
+      });
     return () => { cancelled = true; };
   }, []);
 
@@ -183,7 +185,9 @@ const Dashboard = () => {
     setLoansLoading(true);
     api.get<PendingLoan[]>("/loans/pending")
       .then(({ data }) => { if (!cancelled) setPendingLoans(data); })
-      .catch(() => { /* silently ignore — loans are optional */ })
+      .catch((error) => {
+        console.error("[Dashboard] Loans fetch error:", error.response?.data || error.message);
+      })
       .finally(() => { if (!cancelled) setLoansLoading(false); });
     return () => { cancelled = true; };
   }, []);

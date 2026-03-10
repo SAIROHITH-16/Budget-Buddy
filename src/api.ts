@@ -36,30 +36,30 @@ import { auth } from "@/firebase";
 function resolveBaseURL(): string {
   // 1. Explicit override (baked in at Vite build time) — highest priority.
   //    Set VITE_API_URL in Vercel / Railway / your CI environment.
-  //    The value must include the /api suffix, e.g. https://your-app.onrender.com/api
-  //    As a safety net, append /api automatically if it's missing.
+  //    The value must be your Render backend root, e.g. https://budget-buddy-server.onrender.com
+  //    /api is appended automatically if missing.
   const envUrl = import.meta.env.VITE_API_URL;
   if (envUrl) {
-    return envUrl.endsWith("/api") ? envUrl : envUrl.replace(/\/$/, "") + "/api";
+    const resolved = envUrl.endsWith("/api") ? envUrl : envUrl.replace(/\/$/, "") + "/api";
+    console.info(`[api] Base URL from VITE_API_URL: ${resolved}`);
+    return resolved;
   }
 
   // 2. Development: the Vite dev server proxies /api → localhost:3001,
   //    so a relative path is all we need.
-  if (import.meta.env.DEV) return "/api";
-
-  // 3. Production fallback: use a relative /api path.
-  //    For this to work on Vercel you must add an API proxy rewrite in
-  //    vercel.json  OR  set VITE_API_URL to your backend's full URL.
-  //    Without one of those, every API call will 404.
-  if (import.meta.env.PROD) {
-    console.warn(
-      "[api] VITE_API_URL is not set. API calls will use /api (relative).\n" +
-      "      Add VITE_API_URL=https://your-backend-url/api to your Vercel" +
-      " environment variables, or add an API proxy rewrite to vercel.json."
-    );
+  if (import.meta.env.DEV) {
+    console.info("[api] Dev mode — using Vite proxy at /api");
     return "/api";
   }
 
+  // 3. Production with no VITE_API_URL: fall back to the Vercel rewrite proxy.
+  //    vercel.json forwards /api/:path* → https://budget-buddy-server.onrender.com/api/:path*
+  //    so a relative /api path works as long as vercel.json is deployed.
+  console.info(
+    "[api] VITE_API_URL not set — using relative /api (Vercel proxy).\n" +
+    "      If requests fail, add VITE_API_URL=https://budget-buddy-server.onrender.com" +
+    " to your Vercel environment variables."
+  );
   return "/api";
 }
 
