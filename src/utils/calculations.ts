@@ -1,10 +1,16 @@
 export interface Transaction {
   id: string;
-  type: "income" | "expense";
+  type: "income" | "expense" | "lent" | "repaid";
   amount: number;
   category: string;
   description: string;
   date: string;
+  // Loan-specific fields (only present when type === "lent" or "repaid")
+  borrowerName?: string;
+  dueDate?: string;
+  repaidAmount?: number;
+  remainingAmount?: number;
+  loanStatus?: "PENDING" | "PARTIALLY_REPAID" | "FULLY_REPAID" | "OVERDUE";
 }
 
 /**

@@ -12,8 +12,19 @@ import {
   getCategoryDistribution,
   getDailyIncomeExpenseTrend,
   formatCurrency,
+  type Transaction,
 } from "@/utils/calculations";
-import { TrendingUp, TrendingDown, Wallet, AlertTriangle, AlertCircle } from "lucide-react";
+import { TrendingUp, TrendingDown, Wallet, AlertTriangle, AlertCircle, HandCoins } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import api from "@/api";
 
 // ---------------------------------------------------------------------------
@@ -22,6 +33,17 @@ import api from "@/api";
 interface Budget {
   monthlyLimit: number;
   alertThreshold: number; // 1–100 percent
+}
+
+// Loan as returned by GET /api/loans/pending
+interface PendingLoan {
+  id: string;
+  amount: number;
+  borrowerName: string | null;
+  dueDate: string | null;
+  repaidAmount: number;
+  remainingAmount: number;
+  loanStatus: "PENDING" | "PARTIALLY_REPAID" | "OVERDUE";
 }
 
 const Dashboard = () => {
@@ -138,8 +160,53 @@ const Dashboard = () => {
     };
   }, [transactions]);
 
-  const categoryData       = useMemo(() => getCategoryDistribution(transactions),    [transactions]);
-  const incomeExpenseTrend = useMemo(() => getDailyIncomeExpenseTrend(transactions), [transactions]);
+  // Exclude LENT/REPAID from chart data as well — charts only track income/expense
+  const standardTx = useMemo(
+    () => transactions.filter((tx) => tx.type === "income" || tx.type === "expense"),
+    [transactions]
+  );
+  const categoryData       = useMemo(() => getCategoryDistribution(standardTx),    [standardTx]);
+  const incomeExpenseTrend = useMemo(() => getDailyIncomeExpenseTrend(standardTx), [standardTx]);
+
+  // -------------------------------------------------------------------------
+  // Pending loans
+  // -------------------------------------------------------------------------
+  const [pendingLoans, setPendingLoans]         = useState<PendingLoan[]>([]);
+  const [loansLoading, setLoansLoading]         = useState(true);
+  const [repayTarget, setRepayTarget]           = useState<PendingLoan | null>(null);
+  const [repayAmount, setRepayAmount]           = useState("");
+  const [repaySubmitting, setRepaySubmitting]   = useState(false);
+  const [repayError, setRepayError]             = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoansLoading(true);
+    api.get<PendingLoan[]>("/loans/pending")
+      .then(({ data }) => { if (!cancelled) setPendingLoans(data); })
+      .catch(() => { /* silently ignore — loans are optional */ })
+      .finally(() => { if (!cancelled) setLoansLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const handleRepaySubmit = async () => {
+    if (!repayTarget) return;
+    const amt = Number(repayAmount);
+    if (isNaN(amt) || amt <= 0) { setRepayError("Enter a valid positive amount."); return; }
+    setRepaySubmitting(true);
+    setRepayError("");
+    try {
+      await api.post("/loans/repayment", { loanId: repayTarget.id, amount: amt });
+      // Refresh the loans list
+      const { data } = await api.get<PendingLoan[]>("/loans/pending");
+      setPendingLoans(data);
+      setRepayTarget(null);
+      setRepayAmount("");
+    } catch {
+      setRepayError("Failed to record repayment. Please try again.");
+    } finally {
+      setRepaySubmitting(false);
+    }
+  };
 
   // -------------------------------------------------------------------------
   // Budget calculations
@@ -286,9 +353,163 @@ const Dashboard = () => {
         {loading ? (
           <Skeleton className="h-64 rounded-xl" />
         ) : (
-          <MonthlySpendingChart transactions={transactions} />
+          <MonthlySpendingChart transactions={standardTx} />
         )}
+
+        {/* ------------------------------------------------------------------ */}
+        {/* Pending Receivables Card                                            */}
+        {/* ------------------------------------------------------------------ */}
+        <div className="glass-card p-5 space-y-4">
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-lg bg-amber-500/10 text-amber-500">
+              <HandCoins className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide uppercase" style={{ fontSize: '0.7rem', letterSpacing: '0.08em' }}>Pending Receivables</h3>
+              <p className="text-xs text-muted-foreground">Money you've lent out</p>
+            </div>
+          </div>
+
+          {loansLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-10 rounded-lg" />
+              <Skeleton className="h-10 rounded-lg" />
+            </div>
+          ) : pendingLoans.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-2">No pending loans — you're all settled up!</p>
+          ) : (
+            <ul className="space-y-2">
+              {pendingLoans.map((loan) => (
+                <li
+                  key={loan.id}
+                  className="flex items-center justify-between gap-3 rounded-lg border border-border/50 bg-muted/30 px-4 py-2.5"
+                >
+                  <div className="min-w-0 flex-1">
+                    <span className="text-sm font-medium truncate block">
+                      {loan.borrowerName ?? "Friend"} owes {formatCurrency(loan.remainingAmount)}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {loan.dueDate
+                        ? `Due: ${new Date(loan.dueDate).toLocaleDateString()}`
+                        : "No due date"}
+                      {loan.loanStatus === "OVERDUE" && (
+                        <span className="ml-2 text-red-400 font-medium">OVERDUE</span>
+                      )}
+                      {loan.loanStatus === "PARTIALLY_REPAID" && (
+                        <span className="ml-2 text-amber-400 font-medium">
+                          ({formatCurrency(loan.repaidAmount)} received)
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="shrink-0 text-xs"
+                    onClick={() => { setRepayTarget(loan); setRepayAmount(""); setRepayError(""); }}
+                  >
+                    Mark as Received
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {/* ------------------------------------------------------------------ */}
+        {/* Recent Transactions                                                 */}
+        {/* ------------------------------------------------------------------ */}
+        <div className="glass-card p-5 space-y-3">
+          <h3 className="text-sm font-semibold tracking-wide uppercase" style={{ fontSize: '0.7rem', letterSpacing: '0.08em' }}>Recent Transactions</h3>
+          {loading ? (
+            <div className="space-y-2">
+              {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-10 rounded-lg" />)}
+            </div>
+          ) : transactions.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-2">No transactions yet.</p>
+          ) : (
+            <ul className="space-y-1.5">
+              {[...transactions].slice(0, 10).map((tx: Transaction) => {
+                const isLent    = tx.type === "lent";
+                const isRepaid  = tx.type === "repaid";
+                const isExpense = tx.type === "expense";
+
+                const label = isLent
+                  ? `Lent to ${tx.borrowerName ?? "friend"}`
+                  : isRepaid
+                  ? `Repaid by ${tx.borrowerName ?? "friend"}`
+                  : tx.description;
+
+                const amountClass = isLent
+                  ? "expense-text"
+                  : isRepaid
+                  ? "income-text"
+                  : isExpense
+                  ? "expense-text"
+                  : "income-text";
+
+                const sign = isExpense || isLent ? "-" : "+";
+
+                return (
+                  <li
+                    key={tx.id}
+                    className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg hover:bg-muted/40 transition-colors"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm truncate">{label}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {tx.category} &middot; {new Date(tx.date).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <span className={`text-sm font-semibold font-mono tabular-nums shrink-0 ${amountClass}`}>
+                      {sign}{formatCurrency(tx.amount)}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
       </div>
+
+      {/* -------------------------------------------------------------------- */}
+      {/* Mark-as-Received Dialog                                               */}
+      {/* -------------------------------------------------------------------- */}
+      <Dialog open={!!repayTarget} onOpenChange={(open) => { if (!open) setRepayTarget(null); }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Record Repayment</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-sm text-muted-foreground">
+              Recording repayment from{" "}
+              <span className="font-medium text-foreground">{repayTarget?.borrowerName ?? "friend"}</span>.
+              Remaining: {formatCurrency(repayTarget?.remainingAmount ?? 0)}
+            </p>
+            <div>
+              <Label htmlFor="repay-amount">Amount Received</Label>
+              <Input
+                id="repay-amount"
+                type="number"
+                step="0.01"
+                min="0.01"
+                placeholder="0.00"
+                value={repayAmount}
+                onChange={(e) => { setRepayAmount(e.target.value); setRepayError(""); }}
+              />
+              {repayError && <p className="text-xs expense-text mt-1">{repayError}</p>}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRepayTarget(null)} disabled={repaySubmitting}>
+              Cancel
+            </Button>
+            <Button onClick={handleRepaySubmit} disabled={repaySubmitting}>
+              {repaySubmitting ? "Saving…" : "Confirm"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 };

@@ -9,7 +9,12 @@ const fs             = require("fs");
 const { randomUUID } = require("crypto");
 
 // ── Storage setup ──────────────────────────────────────────────────────────
-const DATA_DIR = path.join(__dirname, "..", "data");
+// In production (Render), store the database on the mounted persistent disk
+// at /var/data so it survives redeploys and restarts.  In development, keep
+// it in the local server/data/ directory as before.
+const DATA_DIR = process.env.NODE_ENV === "production"
+  ? "/var/data"
+  : path.join(__dirname, "..", "data");
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
 const DB_PATH = path.join(DATA_DIR, "budget.db");
@@ -95,6 +100,17 @@ function initSchema(db) {
   ]) {
     try { db.exec(stmt); } catch (_) { /* column already exists */ }
   }
+
+  // Safe column migrations for loan support
+  for (const stmt of [
+    "ALTER TABLE transactions ADD COLUMN borrower_name    TEXT",
+    "ALTER TABLE transactions ADD COLUMN due_date         TEXT",
+    "ALTER TABLE transactions ADD COLUMN repaid_amount    REAL NOT NULL DEFAULT 0",
+    "ALTER TABLE transactions ADD COLUMN remaining_amount REAL",
+    "ALTER TABLE transactions ADD COLUMN loan_status      TEXT NOT NULL DEFAULT 'PENDING'",
+  ]) {
+    try { db.exec(stmt); } catch (_) { /* column already exists */ }
+  }
 }
 
 // ── Column name mappings ───────────────────────────────────────────────────
@@ -105,8 +121,12 @@ const APP_TO_DB = {
   aiCategorized:   "ai_categorized",
   monthlyLimit:    "monthly_limit",
   alertThreshold:  "alert_threshold",
-  createdAt:       "created_at",
-};
+  createdAt:       "created_at",  // Loan fields
+  borrowerName:    "borrower_name",
+  dueDate:         "due_date",
+  repaidAmount:    "repaid_amount",
+  remainingAmount: "remaining_amount",
+  loanStatus:      "loan_status",};
 const DB_TO_APP = Object.fromEntries(
   Object.entries(APP_TO_DB).map(([a, d]) => [d, a])
 );

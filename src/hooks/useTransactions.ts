@@ -22,26 +22,39 @@ import type { Transaction } from "@/utils/calculations";
 // Shape of what the Express API returns for a single transaction
 // ---------------------------------------------------------------------------
 interface RawTransaction {
-  _id: string;         // MongoDB ObjectId string
-  type: "income" | "expense";
+  _id: string;         // SQLite id mapped to _id by fromRow()
+  type: "income" | "expense" | "lent" | "repaid";
   amount: number;
   category: string;
   description: string;
-  date: string;        // ISO date string from MongoDB
+  date: string;        // ISO date string
+  // Loan-specific (only present on lent / repaid records)
+  borrowerName?: string | null;
+  dueDate?: string | null;
+  repaidAmount?: number;
+  remainingAmount?: number | null;
+  loanStatus?: "PENDING" | "PARTIALLY_REPAID" | "FULLY_REPAID" | "OVERDUE";
 }
 
 // ---------------------------------------------------------------------------
 // Map a raw API response object to the app's internal Transaction type
 // ---------------------------------------------------------------------------
 function mapRawToTransaction(raw: RawTransaction): Transaction {
-  return {
-    id: raw._id,
-    type: raw.type,
-    amount: Number(raw.amount),
-    category: raw.category,
+  const tx: Transaction = {
+    id:          raw._id,
+    type:        raw.type,
+    amount:      Number(raw.amount),
+    category:    raw.category,
     description: raw.description,
-    date: raw.date,
+    date:        raw.date,
   };
+  // Forward loan-specific fields when present so the Dashboard can render them
+  if (raw.borrowerName    != null) tx.borrowerName    = raw.borrowerName;
+  if (raw.dueDate         != null) tx.dueDate         = raw.dueDate;
+  if (raw.repaidAmount    != null) tx.repaidAmount    = raw.repaidAmount;
+  if (raw.remainingAmount != null) tx.remainingAmount = raw.remainingAmount;
+  if (raw.loanStatus      != null) tx.loanStatus      = raw.loanStatus;
+  return tx;
 }
 
 // ---------------------------------------------------------------------------
@@ -148,11 +161,14 @@ export function useTransactions(options: UseTransactionsOptions = {}) {
       setError(null);
       try {
         const response = await api.post<RawTransaction>("/transactions", {
-          type: data.type,
-          amount: data.amount,
-          category: data.category || "Uncategorized",
-          description: data.description,
-          date: data.date,
+          type:         data.type,
+          amount:       data.amount,
+          category:     data.category || "Uncategorized",
+          description:  data.description,
+          date:         data.date,
+          // Loan-specific — only sent when present
+          ...(data.borrowerName    && { borrowerName:    data.borrowerName }),
+          ...(data.dueDate         && { dueDate:         data.dueDate }),
         });
         const newTx = mapRawToTransaction(response.data);
         // Prepend to list so the newest transaction appears at the top

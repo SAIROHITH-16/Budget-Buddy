@@ -31,14 +31,14 @@ const transactionSchema = new mongoose.Schema(
     },
 
     // -----------------------------------------------------------------------
-    // type — "income" or "expense"
+    // type — "income", "expense", "lent", or "repaid"
     // -----------------------------------------------------------------------
     type: {
       type: String,
       required: [true, "Transaction type is required"],
       enum: {
-        values: ["income", "expense"],
-        message: 'Transaction type must be either "income" or "expense"',
+        values: ["income", "expense", "lent", "repaid"],
+        message: 'Transaction type must be "income", "expense", "lent", or "repaid"',
       },
     },
 
@@ -110,6 +110,45 @@ const transactionSchema = new mongoose.Schema(
       trim:  true,
       // NOTE: unique:true is NOT set here. Uniqueness is enforced below via
       // a compound sparse index so the constraint is per-user, not global.
+    },
+
+    // -----------------------------------------------------------------------
+    // Loan-specific fields — only populated when type === "lent" or "repaid"
+    // -----------------------------------------------------------------------
+
+    // borrowerName — the friend who borrowed the money
+    borrowerName: {
+      type:     String,
+      trim:     true,
+      maxlength: [100, "Borrower name cannot exceed 100 characters"],
+    },
+
+    // dueDate — when the borrower is expected to repay
+    dueDate: {
+      type: Date,
+    },
+
+    // repaidAmount — cumulative amount received back so far (default 0)
+    repaidAmount: {
+      type:    Number,
+      default: 0,
+      min:     [0, "Repaid amount cannot be negative"],
+    },
+
+    // remainingAmount — amount still owed; defaults to the original amount at creation
+    remainingAmount: {
+      type: Number,
+      min:  [0, "Remaining amount cannot be negative"],
+    },
+
+    // status — lifecycle state of the loan
+    loanStatus: {
+      type:    String,
+      enum:    {
+        values:  ["PENDING", "PARTIALLY_REPAID", "FULLY_REPAID", "OVERDUE"],
+        message: "loanStatus must be PENDING, PARTIALLY_REPAID, FULLY_REPAID, or OVERDUE",
+      },
+      default: "PENDING",
     },
   },
   {

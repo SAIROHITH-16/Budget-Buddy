@@ -29,7 +29,7 @@ const isValidId = (id) => typeof id === "string" && id.trim().length > 0;
 // Plain-JS row validator (replaces Mongoose validateSync)
 function validateRow(item) {
   const errs = [];
-  if (!item.type || !["income","expense"].includes(item.type)) errs.push("type: must be income or expense");
+  if (!item.type || !["income","expense","lent","repaid"].includes(item.type)) errs.push("type: must be income, expense, lent, or repaid");
   if (item.amount === undefined || isNaN(Number(item.amount))) errs.push("amount: must be a number");
   if (!item.date) errs.push("date: required");
   return errs;
@@ -76,9 +76,11 @@ router.get("/", async (req, res) => {
     const limit = Math.min(10000, Math.max(1, parseInt(req.query.limit, 10) || 20));
     const skip  = (page - 1) * limit;
 
-    // Build base Firestore filter (only equality filters — avoids composite index issues)
+    // Build base filter — uid is always required
     const firestoreFilter = { uid: req.user.uid };
-    if (req.query.type === "income" || req.query.type === "expense") {
+    // Allow filtering by any valid type (income, expense, lent, repaid)
+    const validTypes = ["income", "expense", "lent", "repaid"];
+    if (req.query.type && validTypes.includes(req.query.type)) {
       firestoreFilter.type = req.query.type;
     }
 
@@ -138,7 +140,7 @@ router.get("/", async (req, res) => {
 //   }
 // ---------------------------------------------------------------------------
 router.post("/", async (req, res) => {
-  const { type, amount, category, description, date } = req.body;
+  const { type, amount, category, description, date, borrowerName, dueDate } = req.body;
 
   // -------------------------------------------------------------------------
   // Basic input validation — respond 400 for missing required fields
@@ -153,6 +155,22 @@ router.post("/", async (req, res) => {
     return res.status(400).json({
       success: false,
       message: `Bad request: missing required fields: ${missingFields.join(", ")}.`,
+    });
+  }
+
+  // Validate type enum
+  if (!["income", "expense", "lent", "repaid"].includes(type)) {
+    return res.status(400).json({
+      success: false,
+      message: `Bad request: type must be one of: income, expense, lent, repaid.`,
+    });
+  }
+
+  // LENT requires a borrower name
+  if (type === "lent" && !String(borrowerName ?? "").trim()) {
+    return res.status(400).json({
+      success: false,
+      message: "Bad request: borrowerName is required for lent transactions.",
     });
   }
 
@@ -175,18 +193,33 @@ router.post("/", async (req, res) => {
   }
 
   // -------------------------------------------------------------------------
-  // Insert via Firestore
+  // Build the document to insert
+  // -------------------------------------------------------------------------
+  const doc = {
+    uid:         req.user.uid,
+    type,
+    amount:      parsedAmount,
+    category:    category?.trim() || (type === "lent" ? "Loan" : "Uncategorized"),
+    description: description.trim(),
+    date:        typeof date === "string" ? date : parsedDate.toISOString().substring(0, 10),
+  };
+
+  // Attach loan-specific fields when lending money
+  if (type === "lent") {
+    doc.borrowerName    = String(borrowerName).trim();
+    doc.remainingAmount = parsedAmount;
+    doc.loanStatus      = "PENDING";
+    if (dueDate) {
+      const parsedDue = new Date(dueDate);
+      if (!isNaN(parsedDue.getTime())) doc.dueDate = dueDate;
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Insert via SQLite
   // -------------------------------------------------------------------------
   try {
-    const saved = await db.insertOne(TX_COLL, {
-      uid:         req.user.uid,
-      type,
-      amount:      parsedAmount,
-      category:    category?.trim() || "Uncategorized",
-      description: description.trim(),
-      date:        typeof date === "string" ? date : parsedDate.toISOString().substring(0, 10),
-    });
-
+    const saved = await db.insertOne(TX_COLL, doc);
     return res.status(201).json(saved);
   } catch (error) {
     console.error("[POST /transactions] Error:", error);

@@ -8,15 +8,23 @@ import api from "@/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 
 const CATEGORIES = ["Uncategorized", "Salary", "Freelance", "Rent", "Groceries", "Utilities", "Transport", "Entertainment", "Health", "Other"];
 
-const schema = z.object({
-  type: z.enum(["income", "expense"]),
-  amount: z.number().positive("Amount must be positive"),
-  category: z.string().min(1, "Category is required"),
+// Base schema for income / expense
+const baseSchema = z.object({
+  type:        z.enum(["income", "expense", "lent", "repaid"]),
+  amount:      z.number().positive("Amount must be positive"),
+  category:    z.string().min(1, "Category is required"),
   description: z.string().trim().min(1, "Description is required").max(200),
-  date: z.string().min(1, "Date is required"),
+  date:        z.string().min(1, "Date is required"),
+});
+
+// Extended schema for loan transactions
+const loanSchema = baseSchema.extend({
+  borrowerName: z.string().trim().min(1, "Friend's name is required"),
+  dueDate:      z.string().min(1, "Expected return date is required"),
 });
 
 interface TransactionFormProps {
@@ -25,12 +33,15 @@ interface TransactionFormProps {
 
 export function TransactionForm({ onSubmit }: TransactionFormProps) {
   const [currencySymbol, setCurrencySymbol] = useState(getCurrencySymbol());
+  const [isLoan, setIsLoan] = useState(false);
   const [form, setForm] = useState({
-    type: "expense" as "income" | "expense",
+    type: "expense" as "income" | "expense" | "lent" | "repaid",
     amount: "",
     category: "",
     description: "",
     date: new Date().toISOString().split("T")[0],
+    borrowerName: "",
+    dueDate: "",
   });
 
   useEffect(() => {
@@ -76,6 +87,10 @@ export function TransactionForm({ onSubmit }: TransactionFormProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Pick the right schema based on whether this is a loan
+    const schema = isLoan ? loanSchema : baseSchema;
+
     const parsed = schema.safeParse({ ...form, amount: Number(form.amount) });
     if (!parsed.success) {
       const fieldErrors: Record<string, string> = {};
@@ -86,7 +101,16 @@ export function TransactionForm({ onSubmit }: TransactionFormProps) {
       return;
     }
     onSubmit(parsed.data as Omit<Transaction, "id">);
-    setForm({ type: "expense", amount: "", category: "", description: "", date: new Date().toISOString().split("T")[0] });
+    setIsLoan(false);
+    setForm({
+      type: "expense",
+      amount: "",
+      category: "",
+      description: "",
+      date: new Date().toISOString().split("T")[0],
+      borrowerName: "",
+      dueDate: "",
+    });
     setErrors({});
   };
 
@@ -94,23 +118,48 @@ export function TransactionForm({ onSubmit }: TransactionFormProps) {
     <form onSubmit={handleSubmit} className="glass-card p-5 space-y-4">
       <h3 className="text-lg font-semibold">Add Transaction</h3>
 
-      <div className="flex gap-2">
-        {(["income", "expense"] as const).map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => setForm((f) => ({ ...f, type: t }))}
-            className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium capitalize transition-colors ${
-              form.type === t
-                ? t === "income"
-                  ? "bg-income/20 income-text border border-income/30"
-                  : "bg-expense/20 expense-text border border-expense/30"
-                : "bg-muted text-muted-foreground"
-            }`}
-          >
-            {t}
-          </button>
-        ))}
+      {/* ---- Income / Expense toggle (hidden when loan mode is on) ---- */}
+      {!isLoan && (
+        <div className="flex gap-2">
+          {(["income", "expense"] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setForm((f) => ({ ...f, type: t }))}
+              className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium capitalize transition-colors ${
+                form.type === t
+                  ? t === "income"
+                    ? "bg-income/20 income-text border border-income/30"
+                    : "bg-expense/20 expense-text border border-expense/30"
+                  : "bg-muted text-muted-foreground"
+              }`}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* ---- Loan toggle ---- */}
+      <div className="flex items-center justify-between rounded-lg border border-border/50 bg-muted/30 px-4 py-2.5">
+        <div>
+          <p className="text-sm font-medium">Is this a loan to a friend?</p>
+          <p className="text-xs text-muted-foreground">Tracks repayment separately</p>
+        </div>
+        <Switch
+          checked={isLoan}
+          onCheckedChange={(checked) => {
+            setIsLoan(checked);
+            setForm((f) => ({
+              ...f,
+              type: checked ? "lent" : "expense",
+              category: checked ? "Loan" : "",
+              borrowerName: "",
+              dueDate: "",
+            }));
+            setErrors({});
+          }}
+        />
       </div>
 
       <div className="grid grid-cols-2 gap-3">
@@ -183,8 +232,34 @@ export function TransactionForm({ onSubmit }: TransactionFormProps) {
       </div>
 
       <Button type="submit" className="w-full">
-        Add Transaction
+        {isLoan ? "Record Loan" : "Add Transaction"}
       </Button>
+
+      {/* ---- Loan-specific fields ---- */}
+      {isLoan && (
+        <div className="space-y-3 pt-1 border-t border-border/50">
+          <div>
+            <Label htmlFor="borrowerName">Friend's Name <span className="text-red-400">*</span></Label>
+            <Input
+              id="borrowerName"
+              placeholder="e.g. Rahul"
+              value={form.borrowerName}
+              onChange={(e) => setForm((f) => ({ ...f, borrowerName: e.target.value }))}
+            />
+            {errors.borrowerName && <p className="text-xs expense-text mt-1">{errors.borrowerName}</p>}
+          </div>
+          <div>
+            <Label htmlFor="dueDate">Expected Return Date <span className="text-red-400">*</span></Label>
+            <Input
+              id="dueDate"
+              type="date"
+              value={form.dueDate}
+              onChange={(e) => setForm((f) => ({ ...f, dueDate: e.target.value }))}
+            />
+            {errors.dueDate && <p className="text-xs expense-text mt-1">{errors.dueDate}</p>}
+          </div>
+        </div>
+      )}
     </form>
   );
 }

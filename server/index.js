@@ -21,6 +21,7 @@ const insightsRoutes    = require("./routes/insights");
 const budgetRoutes      = require("./routes/budget");
 const parsePdfRoutes    = require("./routes/parsePdf");
 const userRoutes        = require("./routes/users");
+const loansRoutes       = require("./routes/loans");
 
 const PORT        = Number(process.env.PORT) || 3001;
 const CORS_ORIGIN = process.env.CORS_ORIGIN  || "http://localhost:5173";
@@ -70,6 +71,7 @@ app.use("/api/insights",     insightsRoutes);
 app.use("/api/budget",       budgetRoutes);
 app.use("/api/parse-pdf",    parsePdfRoutes);
 app.use("/api/users",        userRoutes);
+app.use("/api/loans",        loansRoutes);
 
 app.get("/health", (_req, res) => {
   res.json({ status: "ok", db: "sqlite", timestamp: new Date().toISOString() });
