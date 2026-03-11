@@ -301,45 +301,9 @@ const Transactions = () => {
               </div>
             )}
 
-            {!loading && (() => {
-              const sections: Array<{ key: string; label: string; colorClass: string; txs: Transaction[] }> = [
-                {
-                  key: "income",
-                  label: "Income",
-                  colorClass: "income-text",
-                  txs: transactions.filter((t) => t.type === "income"),
-                },
-                {
-                  key: "expense",
-                  label: "Expenses",
-                  colorClass: "expense-text",
-                  txs: transactions.filter((t) => t.type === "expense"),
-                },
-                {
-                  key: "lending",
-                  label: "Lending",
-                  colorClass: "text-amber-500",
-                  txs: transactions.filter((t) => t.type === "lent" || t.type === "repaid"),
-                },
-              ].filter((s) => s.txs.length > 0);
-
-              return sections.map(({ key, label: sectionLabel, colorClass, txs }) => (
-                <div key={key} className="space-y-2">
-                  {/* Type section header */}
-                  <div className="sticky top-0 z-10 -mx-1 px-1 py-1.5 bg-background/80 backdrop-blur-sm">
-                    <div className="flex items-center gap-3">
-                      <span className={`text-xs font-semibold uppercase tracking-wider ${colorClass}`}>
-                        {sectionLabel}
-                      </span>
-                      <div className="flex-1 h-px bg-border" />
-                      <span className="text-xs text-muted-foreground/60">
-                        {txs.length} transaction{txs.length !== 1 ? "s" : ""}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Transaction cards */}
-                  {txs.map((tx) => {
+            {!loading && (
+              <div className="space-y-2">
+                {transactions.map((tx) => {
                     const isLent   = tx.type === "lent";
                     const isRepaid = tx.type === "repaid";
                     const isLoan   = isLent || isRepaid;
@@ -427,9 +391,8 @@ const Transactions = () => {
                       </div>
                     );
                   })}
-                </div>
-              ));
-            })()}
+              </div>
+            )}
 
             {/* Pagination */}
             {!loading && totalPages > 1 && (
