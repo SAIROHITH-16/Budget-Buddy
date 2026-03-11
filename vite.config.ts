@@ -21,22 +21,13 @@ export default defineConfig({
   },
   plugins: [react()],
   build: {
-    chunkSizeWarningLimit: 1000,
+    chunkSizeWarningLimit: 3000,
     rollupOptions: {
       output: {
         manualChunks(id) {
           if (id.includes("node_modules")) {
-            if (id.includes("react") || id.includes("react-dom") || id.includes("react-router-dom")) {
-              return "react-vendor";
-            }
-            if (id.includes("firebase")) {
-              return "firebase-vendor";
-            }
             if (id.includes("pdfjs-dist")) {
               return "pdf-vendor";
-            }
-            if (id.includes("@radix-ui") || id.includes("lucide-react") || id.includes("recharts")) {
-              return "ui-vendor";
             }
             return "vendor";
           }
