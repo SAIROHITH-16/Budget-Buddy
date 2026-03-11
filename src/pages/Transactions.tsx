@@ -16,7 +16,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select, SelectContent, SelectGroup, SelectItem, SelectLabel,
+  SelectSeparator, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -175,10 +176,18 @@ const Transactions = () => {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="_all">All types</SelectItem>
-                    <SelectItem value="income">Income</SelectItem>
-                    <SelectItem value="expense">Expense</SelectItem>
-                    <SelectItem value="lent">Loans Given</SelectItem>
-                    <SelectItem value="repaid">Repayments Received</SelectItem>
+                    <SelectSeparator />
+                    <SelectGroup>
+                      <SelectLabel>Standard</SelectLabel>
+                      <SelectItem value="income">Income</SelectItem>
+                      <SelectItem value="expense">Expense</SelectItem>
+                    </SelectGroup>
+                    <SelectSeparator />
+                    <SelectGroup>
+                      <SelectLabel>Lending</SelectLabel>
+                      <SelectItem value="lent">Loans Given</SelectItem>
+                      <SelectItem value="repaid">Repayments Received</SelectItem>
+                    </SelectGroup>
                   </SelectContent>
                 </Select>
 

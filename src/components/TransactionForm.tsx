@@ -15,12 +15,12 @@ import {
 
 const CATEGORIES = ["Uncategorized", "Salary", "Freelance", "Rent", "Groceries", "Utilities", "Transport", "Entertainment", "Health", "Other"];
 
-// Base schema for income / expense — description is optional
+// Base schema for income / expense — description is required
 const baseSchema = z.object({
   type:        z.enum(["income", "expense", "lent", "repaid"]),
   amount:      z.number().positive("Amount must be positive"),
   category:    z.string().min(1, "Category is required"),
-  description: z.string().trim().max(200).optional().default(""),
+  description: z.string().trim().min(1, "Description is required").max(200),
   date:        z.string().min(1, "Date is required"),
 });
 
@@ -231,7 +231,7 @@ export function TransactionForm({ onSubmit }: TransactionFormProps) {
       <div>
         <Label htmlFor="description">
           {isLoan ? "Reason for loan" : "Description"}
-          <span className="ml-1 text-xs text-muted-foreground font-normal">(optional)</span>
+          {isLoan && <span className="ml-1 text-xs text-muted-foreground font-normal">(optional)</span>}
         </Label>
         <Input
           id="description"
