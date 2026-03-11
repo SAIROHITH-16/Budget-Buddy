@@ -21,6 +21,7 @@
 //      - If signed in  → renders child routes via <Outlet />.
 //      - If signed out → redirects to /login, preserving the intended URL.
 
+import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -33,24 +34,33 @@ import { AuthProvider } from "@/context/AuthContext";
 // Route guard — wraps all routes that require authentication
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 
-// Public pages — accessible without logging in
-import Landing from "@/pages/Landing";
-import Login from "@/pages/Login";
-import Register from "@/pages/Register";
-import ForgotPassword from "@/pages/ForgotPassword";
-import About from "@/pages/About";
-import VerifyEmail from "@/pages/VerifyEmail";
-import PhoneSignIn from "@/pages/PhoneSignIn";
+// Shown by <Suspense> while a lazy page chunk is downloading
+import { PageLoader } from "@/components/PageLoader";
 
-// Private pages — only accessible when authenticated
-import Dashboard from "@/pages/Dashboard";
-import Transactions from "@/pages/Transactions";
-import Insights from "@/pages/Insights";
-import Settings from "@/pages/Settings";
-import ReviewQueue from "@/pages/ReviewQueue";
+// ---------------------------------------------------------------------------
+// Lazy page imports — each page is split into its own JS chunk.
+// The browser only downloads a page's chunk the first time the user visits
+// that route, making the initial load faster and subsequent navigations instant.
+// ---------------------------------------------------------------------------
+
+// Public pages
+const Landing       = lazy(() => import("@/pages/Landing"));
+const Login         = lazy(() => import("@/pages/Login"));
+const Register      = lazy(() => import("@/pages/Register"));
+const ForgotPassword = lazy(() => import("@/pages/ForgotPassword"));
+const About         = lazy(() => import("@/pages/About"));
+const VerifyEmail   = lazy(() => import("@/pages/VerifyEmail"));
+const PhoneSignIn   = lazy(() => import("@/pages/PhoneSignIn"));
+
+// Private pages
+const Dashboard     = lazy(() => import("@/pages/Dashboard"));
+const Transactions  = lazy(() => import("@/pages/Transactions"));
+const Insights      = lazy(() => import("@/pages/Insights"));
+const Settings      = lazy(() => import("@/pages/Settings"));
+const ReviewQueue   = lazy(() => import("@/pages/ReviewQueue"));
 
 // Utility pages
-import NotFound from "@/pages/NotFound";
+const NotFound      = lazy(() => import("@/pages/NotFound"));
 
 // ---------------------------------------------------------------------------
 // React Query client — plain instantiation, no custom options needed
@@ -90,6 +100,9 @@ function App() {
             the router context (e.g., for redirect-after-login navigation).
           */}
           <AuthProvider>
+            {/* Suspense boundary — shows PageLoader spinner while any lazy
+                page chunk is being fetched over the network.             */}
+            <Suspense fallback={<PageLoader />}>
             <Routes>
               {/* ----------------------------------------------------------
                   Public routes — anyone can reach these pages
@@ -120,6 +133,7 @@ function App() {
               ---------------------------------------------------------- */}
               <Route path="*" element={<NotFound />} />
             </Routes>
+            </Suspense>
           </AuthProvider>
         </BrowserRouter>
       </TooltipProvider>
