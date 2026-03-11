@@ -8,7 +8,10 @@ import api from "@/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
+import {
+  Select, SelectContent, SelectGroup, SelectItem, SelectLabel,
+  SelectSeparator, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 
 const CATEGORIES = ["Uncategorized", "Salary", "Freelance", "Rent", "Groceries", "Utilities", "Transport", "Entertainment", "Health", "Other"];
 
@@ -38,7 +41,6 @@ interface TransactionFormProps {
 
 export function TransactionForm({ onSubmit }: TransactionFormProps) {
   const [currencySymbol, setCurrencySymbol] = useState(getCurrencySymbol());
-  const [isLoan, setIsLoan] = useState(false);
   const [form, setForm] = useState({
     type: "expense" as "income" | "expense" | "lent" | "repaid",
     amount: "",
@@ -56,6 +58,9 @@ export function TransactionForm({ onSubmit }: TransactionFormProps) {
   }, []);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [categorizing, setCategorizing] = useState(false);
+
+  // Derived — no separate state needed
+  const isLoan = form.type === "lent" || form.type === "repaid";
 
   const autoCategorize = async () => {
     if (!form.description.trim()) return;
@@ -110,7 +115,6 @@ export function TransactionForm({ onSubmit }: TransactionFormProps) {
       ? { ...parsed.data, category: "Loan", description: parsed.data.description || "Loan" }
       : parsed.data;
     onSubmit(payload as Omit<Transaction, "id">);
-    setIsLoan(false);
     setForm({
       type: "expense",
       amount: "",
@@ -127,48 +131,41 @@ export function TransactionForm({ onSubmit }: TransactionFormProps) {
     <form onSubmit={handleSubmit} className="glass-card p-5 space-y-4">
       <h3 className="text-lg font-semibold">Add Transaction</h3>
 
-      {/* ---- Income / Expense toggle (hidden when loan mode is on) ---- */}
-      {!isLoan && (
-        <div className="flex gap-2">
-          {(["income", "expense"] as const).map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setForm((f) => ({ ...f, type: t }))}
-              className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium capitalize transition-colors ${
-                form.type === t
-                  ? t === "income"
-                    ? "bg-income/20 income-text border border-income/30"
-                    : "bg-expense/20 expense-text border border-expense/30"
-                  : "bg-muted text-muted-foreground"
-              }`}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* ---- Loan toggle ---- */}
-      <div className="flex items-center justify-between rounded-lg border border-border/50 bg-muted/30 px-4 py-2.5">
-        <div>
-          <p className="text-sm font-medium">Is this a loan to a friend?</p>
-          <p className="text-xs text-muted-foreground">Tracks repayment separately</p>
-        </div>
-        <Switch
-          checked={isLoan}
-          onCheckedChange={(checked) => {
-            setIsLoan(checked);
+      {/* ---- Transaction type selector ---- */}
+      <div>
+        <Label htmlFor="tx-type">Type</Label>
+        <Select
+          value={form.type}
+          onValueChange={(v) => {
+            const t = v as typeof form.type;
             setForm((f) => ({
               ...f,
-              type: checked ? "lent" : "expense",
-              category: checked ? "Loan" : "",
-              borrowerName: "",
-              dueDate: "",
+              type: t,
+              ...(t === "lent" || t === "repaid"
+                ? { category: "Loan", borrowerName: "", dueDate: "" }
+                : { borrowerName: "", dueDate: "" }
+              ),
             }));
             setErrors({});
           }}
-        />
+        >
+          <SelectTrigger id="tx-type" className="mt-1">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectLabel>Standard</SelectLabel>
+              <SelectItem value="income">Income</SelectItem>
+              <SelectItem value="expense">Expense</SelectItem>
+            </SelectGroup>
+            <SelectSeparator />
+            <SelectGroup>
+              <SelectLabel>Lending</SelectLabel>
+              <SelectItem value="lent">Money Lent</SelectItem>
+              <SelectItem value="repaid">Repayment Received</SelectItem>
+            </SelectGroup>
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="grid grid-cols-2 gap-3">

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Layout } from "@/components/Layout";
 import { TransactionForm } from "@/components/TransactionForm";
@@ -7,7 +7,7 @@ import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 import { CsvImporter } from "@/components/CsvImporter";
 import { CurrencySetupDialog } from "@/components/CurrencySetupDialog";
 import { useTransactions, type TransactionFilters } from "@/hooks/useTransactions";
-import { formatCurrency, groupTransactionsByDate } from "@/utils/calculations";
+import { formatCurrency } from "@/utils/calculations";
 import type { Transaction } from "@/utils/calculations";
 import {
   Pencil, Trash2, ArrowUpRight, ArrowDownRight, Receipt,
@@ -98,8 +98,6 @@ const Transactions = () => {
   };
 
   const hasActiveFilters = search || category || type || startDate || endDate;
-
-  const grouped = useMemo(() => groupTransactionsByDate(transactions), [transactions]);
 
   // Pagination helpers
   const goTo = (p: number) => setPage(Math.max(1, Math.min(p, totalPages || 1)));
@@ -294,113 +292,135 @@ const Transactions = () => {
               </div>
             )}
 
-            {!loading && grouped.map((group) => (
-              <div key={group.dateKey} className="space-y-2">
-                {/* Date section header */}
-                <div className="sticky top-0 z-10 -mx-1 px-1 py-1.5 bg-background/80 backdrop-blur-sm">
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                      {group.label}
-                    </span>
-                    <div className="flex-1 h-px bg-border" />
-                    <span className="text-xs text-muted-foreground/60">
-                      {group.transactions.length} transaction{group.transactions.length !== 1 ? "s" : ""}
-                    </span>
+            {!loading && (() => {
+              const sections: Array<{ key: string; label: string; colorClass: string; txs: Transaction[] }> = [
+                {
+                  key: "income",
+                  label: "Income",
+                  colorClass: "income-text",
+                  txs: transactions.filter((t) => t.type === "income"),
+                },
+                {
+                  key: "expense",
+                  label: "Expenses",
+                  colorClass: "expense-text",
+                  txs: transactions.filter((t) => t.type === "expense"),
+                },
+                {
+                  key: "lending",
+                  label: "Lending",
+                  colorClass: "text-amber-500",
+                  txs: transactions.filter((t) => t.type === "lent" || t.type === "repaid"),
+                },
+              ].filter((s) => s.txs.length > 0);
+
+              return sections.map(({ key, label: sectionLabel, colorClass, txs }) => (
+                <div key={key} className="space-y-2">
+                  {/* Type section header */}
+                  <div className="sticky top-0 z-10 -mx-1 px-1 py-1.5 bg-background/80 backdrop-blur-sm">
+                    <div className="flex items-center gap-3">
+                      <span className={`text-xs font-semibold uppercase tracking-wider ${colorClass}`}>
+                        {sectionLabel}
+                      </span>
+                      <div className="flex-1 h-px bg-border" />
+                      <span className="text-xs text-muted-foreground/60">
+                        {txs.length} transaction{txs.length !== 1 ? "s" : ""}
+                      </span>
+                    </div>
                   </div>
-                </div>
 
-                {/* Transaction cards for this date */}
-                {group.transactions.map((tx) => {
-                  const isLent   = tx.type === "lent";
-                  const isRepaid = tx.type === "repaid";
-                  const isLoan   = isLent || isRepaid;
+                  {/* Transaction cards */}
+                  {txs.map((tx) => {
+                    const isLent   = tx.type === "lent";
+                    const isRepaid = tx.type === "repaid";
+                    const isLoan   = isLent || isRepaid;
 
-                  // Icon & colour bucket
-                  const iconBg    = isLent   ? "bg-amber-500/15"
-                                  : isRepaid ? "bg-emerald-500/15"
-                                  : tx.type === "income" ? "income-bg" : "expense-bg";
-                  const IconEl    = isLoan
-                    ? <HandCoins className={`h-5 w-5 ${isLent ? "text-amber-500" : "text-emerald-500"}`} />
-                    : tx.type === "income"
-                    ? <ArrowUpRight className="h-5 w-5 income-text" />
-                    : <ArrowDownRight className="h-5 w-5 expense-text" />;
+                    // Icon & colour bucket
+                    const iconBg = isLent   ? "bg-amber-500/15"
+                                 : isRepaid ? "bg-emerald-500/15"
+                                 : tx.type === "income" ? "income-bg" : "expense-bg";
+                    const IconEl = isLoan
+                      ? <HandCoins className={`h-5 w-5 ${isLent ? "text-amber-500" : "text-emerald-500"}`} />
+                      : tx.type === "income"
+                      ? <ArrowUpRight className="h-5 w-5 income-text" />
+                      : <ArrowDownRight className="h-5 w-5 expense-text" />;
 
-                  // Primary label
-                  const label = isLent
-                    ? `Loan to: ${tx.borrowerName ?? "friend"}`
-                    : isRepaid
-                    ? `Repayment from: ${tx.borrowerName ?? "friend"}`
-                    : tx.description;
+                    const rowLabel = isLent
+                      ? `Loan to: ${tx.borrowerName ?? "friend"}`
+                      : isRepaid
+                      ? `Repayment from: ${tx.borrowerName ?? "friend"}`
+                      : tx.description;
 
-                  // Sub-label: status badge for LENT, "Repayment" for REPAID, category otherwise
-                  const BADGE_STYLES: Record<string, string> = {
-                    PENDING:           "bg-amber-500/15 text-amber-600 dark:text-amber-400",
-                    PARTIALLY_REPAID:  "bg-blue-500/15 text-blue-600 dark:text-blue-400",
-                    FULLY_REPAID:      "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
-                    OVERDUE:           "bg-red-500/15 text-red-600 dark:text-red-400",
-                    WRITTEN_OFF:       "bg-zinc-500/15 text-zinc-500",
-                  };
-                  const BADGE_LABELS: Record<string, string> = {
-                    PENDING:           "Pending",
-                    PARTIALLY_REPAID:  "Partial",
-                    FULLY_REPAID:      "Repaid",
-                    OVERDUE:           "Overdue",
-                    WRITTEN_OFF:       "Written off",
-                  };
+                    const BADGE_STYLES: Record<string, string> = {
+                      PENDING:          "bg-amber-500/15 text-amber-600 dark:text-amber-400",
+                      PARTIALLY_REPAID: "bg-blue-500/15 text-blue-600 dark:text-blue-400",
+                      FULLY_REPAID:     "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
+                      OVERDUE:          "bg-red-500/15 text-red-600 dark:text-red-400",
+                      WRITTEN_OFF:      "bg-zinc-500/15 text-zinc-500",
+                    };
+                    const BADGE_LABELS: Record<string, string> = {
+                      PENDING:          "Pending",
+                      PARTIALLY_REPAID: "Partial",
+                      FULLY_REPAID:     "Repaid",
+                      OVERDUE:          "Overdue",
+                      WRITTEN_OFF:      "Written off",
+                    };
 
-                  // Amount sign & colour
-                  const amtClass = isRepaid || tx.type === "income" ? "income-text" : "expense-text";
-                  const sign     = isRepaid || tx.type === "income" ? "+" : "-";
+                    const amtClass = isRepaid || tx.type === "income" ? "income-text" : "expense-text";
+                    const sign     = isRepaid || tx.type === "income" ? "+" : "-";
+                    const txDate   = new Date(tx.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
-                  return (
-                    <div
-                      key={tx.id}
-                      className="glass-card p-4 flex items-center gap-4 hover:border-primary/20 transition-colors animate-fade-in"
-                    >
-                      <div className={`p-2 rounded-lg ${iconBg}`}>{IconEl}</div>
+                    return (
+                      <div
+                        key={tx.id}
+                        className="glass-card p-4 flex items-center gap-4 hover:border-primary/20 transition-colors animate-fade-in"
+                      >
+                        <div className={`p-2 rounded-lg ${iconBg}`}>{IconEl}</div>
 
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm truncate">{label}</p>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          {isLent && tx.loanStatus ? (
-                            <span className={`inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
-                              BADGE_STYLES[tx.loanStatus] ?? "bg-muted text-muted-foreground"
-                            }`}>
-                              {BADGE_LABELS[tx.loanStatus] ?? tx.loanStatus}
-                            </span>
-                          ) : isRepaid ? (
-                            <span className="text-xs text-muted-foreground">Loan Repayment</span>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">{tx.category}</span>
-                          )}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate">{rowLabel}</p>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            {isLent && tx.loanStatus ? (
+                              <span className={`inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
+                                BADGE_STYLES[tx.loanStatus] ?? "bg-muted text-muted-foreground"
+                              }`}>
+                                {BADGE_LABELS[tx.loanStatus] ?? tx.loanStatus}
+                              </span>
+                            ) : isRepaid ? (
+                              <span className="text-xs text-muted-foreground">Loan Repayment</span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">{tx.category}</span>
+                            )}
+                            <span className="text-xs text-muted-foreground/50">&middot; {txDate}</span>
+                          </div>
+                        </div>
+
+                        <p className={`font-mono font-semibold text-sm shrink-0 ${amtClass}`}>
+                          {sign}{formatCurrency(tx.amount)}
+                        </p>
+
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost" size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                            onClick={() => setEditTx(tx)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost" size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                            onClick={() => setDeleteTxId(tx.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
                       </div>
-
-                      <p className={`font-mono font-semibold text-sm shrink-0 ${amtClass}`}>
-                        {sign}{formatCurrency(tx.amount)}
-                      </p>
-
-                      <div className="flex gap-1">
-                        <Button
-                          variant="ghost" size="icon"
-                          className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                          onClick={() => setEditTx(tx)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost" size="icon"
-                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                          onClick={() => setDeleteTxId(tx.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ))}
+                    );
+                  })}
+                </div>
+              ));
+            })()}
 
             {/* Pagination */}
             {!loading && totalPages > 1 && (
