@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Github, Linkedin, ExternalLink, Mail } from "lucide-react";
 import { Navbar } from "@/components/Navbar";
+import { HandCoins, ShieldCheck, SplitSquareVertical } from "lucide-react";
 
 // ── Data ─────────────────────────────────────────────────────────────────────
 
@@ -28,8 +29,8 @@ const ENGINE_STEPS = [
   {
     step: "03",
     icon: "🔀",
-    title: "Hybrid Deduplication",
-    body: "Seamlessly blend automation with manual control. Add cash expenses alongside your uploaded PDFs. Our strict state-management engine uses unique fingerprinting to ensure zero double-counting.",
+    title: "Hybrid Deduplication Engine",
+    body: "Our server-side deduplication layer generates a content fingerprint from each transaction's amount, date, and normalised description before writing to the database. Whether you upload a CSV, parse a PDF, or add entries manually, any record that already exists is silently skipped — preventing double-counting at the database layer, not just in the UI.",
     accent: "text-violet-700",
     border: "border-violet-300/70",
     glow: "hover:border-violet-400/90 hover:shadow-violet-100",
@@ -37,8 +38,8 @@ const ENGINE_STEPS = [
   {
     step: "04",
     icon: "📊",
-    title: "The Flawless Ledger",
-    body: "All data flows into a professional-grade dashboard. It dynamically strips formatting, checks for strict Income/Expense markers, and calculates your absolute Net Cash Flow.",
+    title: "The Strict 4-Bucket Ledger",
+    body: "All data flows into a mathematically rigorous 4-bucket accounting engine. Income and Expenses are ring-fenced from Loans Given (LENT) and Repayments Received (REPAID) — so your Wallet Balance (Income + Repaid − Expense − Lent) is always correct. Money lent to friends is tracked as an Accounts Receivable balance and never inflates your true expenses or income.",
     accent: "text-emerald-700",
     border: "border-emerald-300/70",
     glow: "hover:border-emerald-400/90 hover:shadow-emerald-100",
@@ -54,7 +55,7 @@ const TECH_STACKS = [
   {
     icon: "⚙️",
     title: "Backend & Database",
-    items: ["Node.js", "Express", "MongoDB Atlas", "Mongoose ODM", "RESTful APIs"],
+    items: ["Node.js", "Express", "Supabase (PostgreSQL)", "Row-Level Security (RLS)", "RESTful APIs"],
   },
   {
     icon: "🔐",
@@ -65,6 +66,36 @@ const TECH_STACKS = [
     icon: "✨",
     title: "AI & Serverless",
     items: ["Supabase Edge Functions", "GitHub Models", "OpenAI API", "AI Categorization"],
+  },
+];
+
+const ADVANCED_FEATURES = [
+  {
+    icon: HandCoins,
+    accent: "text-amber-600",
+    bg: "bg-amber-50/60",
+    border: "border-amber-200/70",
+    glow: "hover:border-amber-300/80 hover:shadow-amber-100",
+    title: "Accounts Receivable — Hand Loans",
+    body: "Track every rupee lent to friends with a full lifecycle: borrower name, due date, and five status stages — Pending, Partially Repaid, Fully Repaid, Overdue, and Written Off (Bad Debt). Record partial repayments incrementally; the remaining balance updates automatically. Loans are surfaced in a dedicated 'Money Lending' dashboard card, completely isolated from your personal spending data.",
+  },
+  {
+    icon: SplitSquareVertical,
+    accent: "text-violet-600",
+    bg: "bg-violet-50/60",
+    border: "border-violet-200/70",
+    glow: "hover:border-violet-300/80 hover:shadow-violet-100",
+    title: "Strict Dashboard Math Separation",
+    body: "Standard budgeting (Income / Expense) is architecturally separated from money-lending flows (Lent / Repaid). The Wallet Balance formula — (Income + Repaid) − (Expense + Lent) — gives you a true cash position. Charts and budget-progress bars only consume Income and Expense data, so a ₹10,000 loan to a friend never falsely inflates your reported spending.",
+  },
+  {
+    icon: ShieldCheck,
+    accent: "text-emerald-700",
+    bg: "bg-emerald-50/60",
+    border: "border-emerald-200/70",
+    glow: "hover:border-emerald-300/80 hover:shadow-emerald-100",
+    title: "Enterprise-Grade Data Isolation",
+    body: "Every database table is protected by Supabase Row-Level Security (RLS) policies. All queries are automatically scoped to the authenticated user's UID — it is physically impossible for one user's data to be read or mutated by another, even if the API were to receive a tampered token. The service-role key never leaves the backend.",
   },
 ];
 
@@ -165,7 +196,56 @@ export default function About() {
         </section>
 
         {/* ================================================================ */}
-        {/* 3. Technical Architecture                                        */}
+        {/* 3. Advanced Features                                             */}
+        {/* ================================================================ */}
+        <section className="space-y-10">
+          <div className="text-center space-y-3">
+            <p className="text-emerald-600 text-sm font-semibold uppercase tracking-widest">
+              Beyond Basic Tracking
+            </p>
+            <h2 className="text-3xl sm:text-4xl font-bold text-slate-900">
+              Production-Grade Features
+            </h2>
+            <p className="text-slate-600 max-w-2xl mx-auto">
+              Capabilities that elevate Budget Buddy from a simple ledger to a
+              robust personal finance platform.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {ADVANCED_FEATURES.map((f) => {
+              const Icon = f.icon;
+              return (
+                <Card
+                  key={f.title}
+                  className={`
+                    ${f.bg} backdrop-blur-xl
+                    border ${f.border} ${f.glow}
+                    hover:shadow-xl hover:bg-white/90
+                    transition-all duration-300
+                  `}
+                >
+                  <CardHeader className="pb-2">
+                    <CardTitle className={`text-lg font-bold ${f.accent} flex items-center gap-3`}>
+                      <span className={`p-2 rounded-lg bg-white/70 ${f.accent}`}>
+                        <Icon className="h-5 w-5" />
+                      </span>
+                      {f.title}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-slate-600 leading-relaxed text-sm">
+                      {f.body}
+                    </p>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* ================================================================ */}
+        {/* 4. Technical Architecture                                        */}
         {/* ================================================================ */}
         <section className="space-y-10">
           <div className="text-center space-y-3">
@@ -211,7 +291,7 @@ export default function About() {
         </section>
 
         {/* ================================================================ */}
-        {/* 4. Meet the Developer                                            */}
+        {/* 5. Meet the Developer                                            */}
         {/* ================================================================ */}
         <section className="space-y-10">
           <div className="text-center space-y-3">
@@ -296,7 +376,7 @@ export default function About() {
         </section>
 
         {/* ================================================================ */}
-        {/* 5. Footer CTA                                                    */}
+        {/* 6. Footer CTA                                                    */}
         {/* ================================================================ */}
         <section className="text-center space-y-6 py-8 border-t border-violet-100">
           <div className="space-y-3">
