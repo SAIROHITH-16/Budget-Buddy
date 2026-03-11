@@ -47,31 +47,32 @@ function loanFromRow(row) {
 // ---------------------------------------------------------------------------
 router.get("/pending", async (req, res) => {
   try {
-    const db   = getDb();
-    const rows = db.prepare(`
-      SELECT * FROM transactions
-      WHERE uid = ? AND type = 'lent'
-        AND loan_status IN ('PENDING', 'PARTIALLY_REPAID', 'OVERDUE')
-      ORDER BY date DESC, id DESC
-    `).all(req.user.uid);
+    const sb = getDb();
+    const { data: rows, error } = await sb
+      .from("transactions")
+      .select("*")
+      .eq("uid", req.user.uid)
+      .eq("type", "lent")
+      .in("loan_status", ["PENDING", "PARTIALLY_REPAID", "OVERDUE"])
+      .order("date", { ascending: false })
+      .order("id", { ascending: false });
+    if (error) throw new Error(error.message);
 
     // Auto-mark as OVERDUE server-side if due date has passed
     const today = new Date();
-    const loans = rows.map((row) => {
+    const loans = await Promise.all((rows || []).map(async (row) => {
       const loan = loanFromRow(row);
       if (
         loan.loanStatus !== "FULLY_REPAID" &&
         loan.dueDate &&
-        new Date(loan.dueDate) < today
+        new Date(loan.dueDate) < today &&
+        loan.loanStatus !== "OVERDUE"
       ) {
-        if (loan.loanStatus !== "OVERDUE") {
-          db.prepare(`UPDATE transactions SET loan_status = 'OVERDUE' WHERE id = ?`)
-            .run(row.id);
-          loan.loanStatus = "OVERDUE";
-        }
+        await sb.from("transactions").update({ loan_status: "OVERDUE" }).eq("id", row.id);
+        loan.loanStatus = "OVERDUE";
       }
       return loan;
-    });
+    }));
 
     return res.json(loans);
   } catch (err) {
@@ -118,12 +119,17 @@ router.post("/repayment", async (req, res) => {
   }
 
   try {
-    const db = getDb();
+    const sb = getDb();
 
-    // ── Ownership + existence check (outside the transaction for early exit) ─
-    const loanRow = db.prepare(
-      `SELECT * FROM transactions WHERE id = ? AND uid = ? AND type = 'lent' LIMIT 1`
-    ).get(loanId, req.user.uid);
+    // ── Ownership + existence check ───────────────────────────────────────────
+    const { data: loanRow, error: fetchErr } = await sb
+      .from("transactions")
+      .select("*")
+      .eq("id", loanId)
+      .eq("uid", req.user.uid)
+      .eq("type", "lent")
+      .maybeSingle();
+    if (fetchErr) throw new Error(fetchErr.message);
 
     if (!loanRow) {
       return res.status(404).json({
@@ -138,55 +144,53 @@ router.post("/repayment", async (req, res) => {
       });
     }
 
-    // ── Atomic update ─────────────────────────────────────────────────────────
-    let updatedLoanRow, repaymentRow;
+    // ── Compute new values ────────────────────────────────────────────────────
+    const currentRepaid = loanRow.repaid_amount || 0;
+    const newRepaid     = currentRepaid + parsedAmount;
+    const originalAmt   = loanRow.amount || 0;
+    const newRemaining  = Math.max(0, originalAmt - newRepaid);
 
-    db.transaction(() => {
-      const currentRepaid = loanRow.repaid_amount || 0;
-      const newRepaid     = currentRepaid + parsedAmount;
-      const originalAmt   = loanRow.amount || 0;
-      const newRemaining  = Math.max(0, originalAmt - newRepaid);
+    let newStatus;
+    if (newRemaining <= 0) {
+      newStatus = "FULLY_REPAID";
+    } else if (newRepaid > 0) {
+      const isOverdue = loanRow.due_date && new Date(loanRow.due_date) < new Date();
+      newStatus = isOverdue ? "OVERDUE" : "PARTIALLY_REPAID";
+    } else {
+      newStatus = "PENDING";
+    }
 
-      // Determine new status
-      let newStatus;
-      if (newRemaining <= 0) {
-        newStatus = "FULLY_REPAID";
-      } else if (newRepaid > 0) {
-        // Check overdue before assigning PARTIALLY_REPAID
-        const isOverdue =
-          loanRow.due_date && new Date(loanRow.due_date) < new Date();
-        newStatus = isOverdue ? "OVERDUE" : "PARTIALLY_REPAID";
-      } else {
-        newStatus = "PENDING";
-      }
+    // 1. Update the loan record
+    const { data: updatedLoanRow, error: updateErr } = await sb
+      .from("transactions")
+      .update({ repaid_amount: newRepaid, remaining_amount: newRemaining, loan_status: newStatus })
+      .eq("id", loanId)
+      .select()
+      .single();
+    if (updateErr) throw new Error(updateErr.message);
 
-      // 1. Update the loan record
-      db.prepare(`
-        UPDATE transactions
-        SET repaid_amount = ?, remaining_amount = ?, loan_status = ?
-        WHERE id = ?
-      `).run(newRepaid, newRemaining, newStatus, loanId);
-
-      // 2. Create a REPAID transaction (money returning to the user)
-      const repayId   = randomUUID();
-      const today     = new Date().toISOString().substring(0, 10);
-      const borrower  = loanRow.borrower_name || "friend";
-      const desc      = `Repaid by ${borrower}`;
-
-      db.prepare(`
-        INSERT INTO transactions
-          (id, uid, type, amount, category, description, date,
-           needs_review, ai_categorized, borrower_name, loan_status)
-        VALUES (?, ?, 'repaid', ?, 'Loan Repayment', ?, ?, 0, 0, ?, 'FULLY_REPAID')
-      `).run(
-        repayId, req.user.uid, parsedAmount, desc, today,
-        loanRow.borrower_name || null
-      );
-
-      // Read back the updated rows
-      updatedLoanRow = db.prepare(`SELECT * FROM transactions WHERE id = ?`).get(loanId);
-      repaymentRow   = db.prepare(`SELECT * FROM transactions WHERE id = ?`).get(repayId);
-    })();
+    // 2. Create a REPAID transaction (money returning to the user)
+    const repayId  = randomUUID();
+    const today    = new Date().toISOString().substring(0, 10);
+    const borrower = loanRow.borrower_name || "friend";
+    const { data: repaymentRow, error: insertErr } = await sb
+      .from("transactions")
+      .insert({
+        id:             repayId,
+        uid:            req.user.uid,
+        type:           "repaid",
+        amount:         parsedAmount,
+        category:       "Loan Repayment",
+        description:    `Repaid by ${borrower}`,
+        date:           today,
+        needs_review:   false,
+        ai_categorized: false,
+        borrower_name:  loanRow.borrower_name || null,
+        loan_status:    "FULLY_REPAID",
+      })
+      .select()
+      .single();
+    if (insertErr) throw new Error(insertErr.message);
 
     return res.status(201).json({
       success:              true,

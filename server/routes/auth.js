@@ -119,18 +119,18 @@ router.post("/verify-phone-email", async (req, res) => {
     const formattedPhone = `+${String(country_code).replace(/^\+/, "")}${phone_no}`;
 
     // ── 5. Find or create the user ──────────────────────────────────────────
-    const db  = getDb();
+    const sb  = getDb();
     const now = new Date().toISOString();
 
-    // Normalise the stored phone for comparison (strip spaces, dashes, dots)
+    // Normalise stored phone for comparison (strip spaces, dashes, dots)
     const normalise = (p) => p.replace(/[\s\-.()]/g, "");
+    const normPhone = normalise(formattedPhone);
 
-    const existingUser = db
-      .prepare(
-        `SELECT * FROM users
-         WHERE replace(replace(replace(replace(phone,' ',''),'-',''),'(',''),')','') = ?`
-      )
-      .get(normalise(formattedPhone));
+    // Fetch all users and normalise in JS (Supabase doesn't support SQL REPLACE in JS client)
+    const { data: allUsers } = await sb.from("users").select("*");
+    const existingUser = (allUsers || []).find(
+      (u) => u.phone && normalise(u.phone) === normPhone
+    );
 
     let firebaseUid;
 
@@ -138,9 +138,10 @@ router.post("/verify-phone-email", async (req, res) => {
       // ── User found — mark their phone as verified ─────────────────────────
       firebaseUid = existingUser.firebase_uid;
 
-      db.prepare(
-        "UPDATE users SET is_phone_verified = 1, updated_at = ? WHERE firebase_uid = ?"
-      ).run(now, firebaseUid);
+      await sb
+        .from("users")
+        .update({ is_phone_verified: true, updated_at: now })
+        .eq("firebase_uid", firebaseUid);
 
     } else {
       // ── User not found — check Firebase Auth, or create a new user ─────────
@@ -156,17 +157,19 @@ router.post("/verify-phone-email", async (req, res) => {
         firebaseUid     = newFbUser.uid;
       }
 
-      // Create the SQLite user record.
+      // Create the Supabase user record.
       // Email is a placeholder because phone-only sign-in provides no email.
-      // The user can update their profile with a real email later.
-      const id               = randomUUID();
       const placeholderEmail = `phone_${firebaseUid.slice(0, 8)}@phoneauth.local`;
 
-      db.prepare(
-        `INSERT INTO users
-           (id, firebase_uid, name, email, phone, is_phone_verified, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, 1, ?, ?)`
-      ).run(id, firebaseUid, "Phone User", placeholderEmail, formattedPhone, now, now);
+      await sb.from("users").insert({
+        firebase_uid:      firebaseUid,
+        name:              "Phone User",
+        email:             placeholderEmail,
+        phone:             formattedPhone,
+        is_phone_verified: true,
+        created_at:        now,
+        updated_at:        now,
+      });
     }
 
     // ── 6. Generate a Firebase Custom Token ────────────────────────────────
@@ -238,12 +241,11 @@ router.post("/send-otp", async (req, res) => {
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
 
     // Upsert OTP into phone_otps (replace any existing row for this number)
-    const db = getDb();
-    db.prepare(
-      `INSERT INTO phone_otps (phone, otp, expires_at)
-       VALUES (?, ?, ?)
-       ON CONFLICT(phone) DO UPDATE SET otp = excluded.otp, expires_at = excluded.expires_at, created_at = datetime('now')`
-    ).run(e164, otp, expiresAt);
+    const sb = getDb();
+    const { error: upsertErr } = await sb
+      .from("phone_otps")
+      .upsert({ phone: e164, otp, expires_at: expiresAt }, { onConflict: "phone" });
+    if (upsertErr) throw new Error(upsertErr.message);
 
     // Send OTP via Fast2SMS quick route ('q') — no DLT template required
     const axios   = require("axios");
@@ -327,14 +329,18 @@ router.post("/verify-otp", async (req, res) => {
     const e164 = `+91${localNumber}`;
 
     // Look up the stored OTP
-    const db  = getDb();
-    const row = db.prepare("SELECT * FROM phone_otps WHERE phone = ?").get(e164);
+    const sb  = getDb();
+    const { data: row } = await sb
+      .from("phone_otps")
+      .select("*")
+      .eq("phone", e164)
+      .maybeSingle();
 
     if (!row) {
       return res.status(400).json({ success: false, error: "No OTP was sent to this number. Please request one first." });
     }
     if (new Date(row.expires_at) < new Date()) {
-      db.prepare("DELETE FROM phone_otps WHERE phone = ?").run(e164);
+      await sb.from("phone_otps").delete().eq("phone", e164);
       return res.status(400).json({ success: false, error: "OTP has expired. Please request a new one." });
     }
     if (row.otp !== String(otp)) {
@@ -342,25 +348,24 @@ router.post("/verify-otp", async (req, res) => {
     }
 
     // OTP is valid — delete it so it cannot be reused
-    db.prepare("DELETE FROM phone_otps WHERE phone = ?").run(e164);
+    await sb.from("phone_otps").delete().eq("phone", e164);
 
     const now = new Date().toISOString();
 
     // Find or create the user
-    const existingUser = db
-      .prepare(
-        `SELECT * FROM users
-         WHERE replace(replace(replace(replace(phone,' ',''),'-',''),'(',''),')','') = ?`
-      )
-      .get(normalisePhone(e164));
+    const { data: allUsersOtp } = await sb.from("users").select("*");
+    const existingUser = (allUsersOtp || []).find(
+      (u) => u.phone && normalisePhone(u.phone) === normalisePhone(e164)
+    );
 
     let firebaseUid;
 
     if (existingUser) {
       firebaseUid = existingUser.firebase_uid;
-      db.prepare(
-        "UPDATE users SET is_phone_verified = 1, updated_at = ? WHERE firebase_uid = ?"
-      ).run(now, firebaseUid);
+      await sb
+        .from("users")
+        .update({ is_phone_verified: true, updated_at: now })
+        .eq("firebase_uid", firebaseUid);
     } else {
       // Check Firebase Auth for existing record, otherwise create one
       try {
@@ -371,14 +376,16 @@ router.post("/verify-otp", async (req, res) => {
         firebaseUid     = newFbUser.uid;
       }
 
-      const id               = randomUUID();
       const placeholderEmail = `phone_${firebaseUid.slice(0, 8)}@phoneauth.local`;
-
-      db.prepare(
-        `INSERT INTO users
-           (id, firebase_uid, name, email, phone, is_phone_verified, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, 1, ?, ?)`
-      ).run(id, firebaseUid, "Phone User", placeholderEmail, e164, now, now);
+      await sb.from("users").insert({
+        firebase_uid:      firebaseUid,
+        name:              "Phone User",
+        email:             placeholderEmail,
+        phone:             e164,
+        is_phone_verified: true,
+        created_at:        now,
+        updated_at:        now,
+      });
     }
 
     // Issue a Firebase Custom Token so the client can establish a Firebase session
@@ -454,7 +461,7 @@ router.post("/verify-registration", (_req, res) => {
 // Returns: { success: true, user: { ... }, created: boolean }
 //          201 on first-time creation, 200 on update
 // ---------------------------------------------------------------------------
-router.post("/firebase-login", verifyToken, (req, res) => {
+router.post("/firebase-login", verifyToken, async (req, res) => {
   try {
     // ── Extract identity from the verified JWT ──────────────────────────────
     const { uid, email, name: tokenName } = req.user;
@@ -466,31 +473,28 @@ router.post("/firebase-login", verifyToken, (req, res) => {
     const resolvedName  = bodyName || tokenName || (email ? email.split("@")[0] : "User");
     const resolvedEmail = email || null;
 
-    const db  = getDb();
+    const sb  = getDb();
     const now = new Date().toISOString();
 
     // ── Check for existing record ───────────────────────────────────────────
-    const existing = db.prepare(
-      "SELECT * FROM users WHERE firebase_uid = ?"
-    ).get(uid);
+    const { data: existing } = await sb
+      .from("users")
+      .select("*")
+      .eq("firebase_uid", uid)
+      .maybeSingle();
 
     if (existing) {
       // Update mutable fields — never overwrite phone with null on login
-      db.prepare(`
-        UPDATE users
-        SET name = ?, updated_at = ?
-        WHERE firebase_uid = ?
-      `).run(resolvedName, now, uid);
+      const updates = { name: resolvedName, updated_at: now };
+      if (bodyPhone) updates.phone = bodyPhone;
 
-      if (bodyPhone) {
-        db.prepare(
-          "UPDATE users SET phone = ?, updated_at = ? WHERE firebase_uid = ?"
-        ).run(bodyPhone, now, uid);
-      }
+      await sb.from("users").update(updates).eq("firebase_uid", uid);
 
-      const updated = db.prepare(
-        "SELECT * FROM users WHERE firebase_uid = ?"
-      ).get(uid);
+      const { data: updated } = await sb
+        .from("users")
+        .select("*")
+        .eq("firebase_uid", uid)
+        .single();
 
       return res.status(200).json({
         success: true,
@@ -508,15 +512,19 @@ router.post("/firebase-login", verifyToken, (req, res) => {
     }
 
     // ── First-time login — create a new record ──────────────────────────────
-    const id = randomUUID();
-    db.prepare(`
-      INSERT INTO users (id, firebase_uid, name, email, phone, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(id, uid, resolvedName, resolvedEmail, bodyPhone || null, now, now);
-
-    const created = db.prepare(
-      "SELECT * FROM users WHERE firebase_uid = ?"
-    ).get(uid);
+    const { data: created, error: insertErr } = await sb
+      .from("users")
+      .insert({
+        firebase_uid: uid,
+        name:         resolvedName,
+        email:        resolvedEmail,
+        phone:        bodyPhone || null,
+        created_at:   now,
+        updated_at:   now,
+      })
+      .select()
+      .single();
+    if (insertErr) throw new Error(insertErr.message);
 
     return res.status(201).json({
       success: true,

@@ -1,5 +1,5 @@
 // server/routes/users.js
-// User profile management using SQLite (budget.db).
+// User profile management using Supabase Postgres.
 //
 // Routes:
 //   POST  /api/users/profile               → create or update user profile
@@ -35,11 +35,11 @@ function toPublicProfile(row) {
 
 // ---------------------------------------------------------------------------
 // POST /api/users/profile
-// Create or update a user profile in SQLite (upsert by firebase_uid).
+// Create or update a user profile in Supabase (upsert by firebase_uid).
 //
 // Body: { firebaseUid, name, email, phone? }
 // ---------------------------------------------------------------------------
-router.post("/profile", (req, res) => {
+router.post("/profile", async (req, res) => {
   try {
     const { firebaseUid, name, email, phone } = req.body;
 
@@ -48,25 +48,27 @@ router.post("/profile", (req, res) => {
     if (!name)        return res.status(400).json({ success: false, error: "name is required" });
     if (!email)       return res.status(400).json({ success: false, error: "email is required" });
 
-    const db  = getDb();
+    const sb  = getDb();
     const now = new Date().toISOString();
 
     // Check if user already exists
-    const existing = db.prepare(
-      "SELECT * FROM users WHERE firebase_uid = ?"
-    ).get(firebaseUid);
+    const { data: existing } = await sb
+      .from("users")
+      .select("*")
+      .eq("firebase_uid", firebaseUid)
+      .maybeSingle();
 
     if (existing) {
-      // Update
-      db.prepare(`
-        UPDATE users
-        SET name = ?, email = ?, phone = ?, updated_at = ?
-        WHERE firebase_uid = ?
-      `).run(name, email, phone || null, now, firebaseUid);
+      await sb
+        .from("users")
+        .update({ name, email, phone: phone || null, updated_at: now })
+        .eq("firebase_uid", firebaseUid);
 
-      const updated = db.prepare(
-        "SELECT * FROM users WHERE firebase_uid = ?"
-      ).get(firebaseUid);
+      const { data: updated } = await sb
+        .from("users")
+        .select("*")
+        .eq("firebase_uid", firebaseUid)
+        .single();
 
       return res.status(200).json({
         success: true,
@@ -76,15 +78,19 @@ router.post("/profile", (req, res) => {
     }
 
     // Insert new
-    const id = randomUUID();
-    db.prepare(`
-      INSERT INTO users (id, firebase_uid, name, email, phone, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(id, firebaseUid, name, email, phone || null, now, now);
-
-    const created = db.prepare(
-      "SELECT * FROM users WHERE id = ?"
-    ).get(id);
+    const { data: created, error: insertErr } = await sb
+      .from("users")
+      .insert({
+        firebase_uid: firebaseUid,
+        name,
+        email,
+        phone: phone || null,
+        created_at: now,
+        updated_at: now,
+      })
+      .select()
+      .single();
+    if (insertErr) throw new Error(insertErr.message);
 
     return res.status(201).json({
       success: true,
@@ -110,21 +116,22 @@ router.post("/profile", (req, res) => {
 // Query param: phone (e.g. "+1 234 567 8900" or "1234567890")
 // Returns: { success: true, email: "user@example.com" }
 // ---------------------------------------------------------------------------
-router.get("/lookup-by-phone", (req, res) => {
+router.get("/lookup-by-phone", async (req, res) => {
   try {
     const raw = (req.query.phone || "").toString().trim();
     if (!raw) {
       return res.status(400).json({ success: false, error: "phone query parameter is required" });
     }
 
-    // Normalise: strip spaces, dashes, parentheses for matching
-    const normalised = raw.replace(/[\s\-().]/g, "");
+    const normalise = (p) => p.replace(/[\s\-().]/g, "");
+    const normalised = normalise(raw);
 
-    const db = getDb();
-    // Try exact match first, then normalised
-    const user =
-      db.prepare("SELECT email FROM users WHERE replace(replace(replace(replace(phone,' ',''),'-',''),'(',''),')','') = ?").get(normalised) ||
-      db.prepare("SELECT email FROM users WHERE phone = ?").get(raw);
+    const sb = getDb();
+    // Fetch all users and normalise phone in JS (Supabase JS client doesn't support SQL REPLACE)
+    const { data: allUsers } = await sb.from("users").select("email, phone");
+    const user = (allUsers || []).find(
+      (u) => u.phone && (normalise(u.phone) === normalised || u.phone === raw)
+    );
 
     if (!user) {
       return res.status(404).json({ success: false, error: "No account found with this phone number." });
@@ -142,14 +149,16 @@ router.get("/lookup-by-phone", (req, res) => {
 // Retrieve the authenticated user's profile from SQLite.
 // Protected by verifyToken — requires valid Firebase JWT.
 // ---------------------------------------------------------------------------
-router.get("/profile", verifyToken, (req, res) => {
+router.get("/profile", verifyToken, async (req, res) => {
   try {
     const firebaseUid = req.user.uid;
 
-    const db   = getDb();
-    const user = db.prepare(
-      "SELECT * FROM users WHERE firebase_uid = ?"
-    ).get(firebaseUid);
+    const sb = getDb();
+    const { data: user } = await sb
+      .from("users")
+      .select("*")
+      .eq("firebase_uid", firebaseUid)
+      .maybeSingle();
 
     if (!user) {
       return res.status(404).json({
@@ -185,11 +194,15 @@ router.post("/send-activation-email", async (req, res) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ success: false, error: "email is required" });
 
-    const db   = getDb();
-    const user = db.prepare("SELECT * FROM users WHERE email = ?").get(email.toLowerCase().trim());
+    const sb = getDb();
+    const { data: user } = await sb
+      .from("users")
+      .select("*")
+      .eq("email", email.toLowerCase().trim())
+      .maybeSingle();
     if (!user) return res.status(404).json({ success: false, error: "No account found with this email." });
 
-    if (user.is_verified === 1) {
+    if (user.is_verified === true) {
       return res.status(200).json({ success: true, message: "Email already verified." });
     }
 
@@ -197,9 +210,10 @@ router.post("/send-activation-email", async (req, res) => {
     const token   = randomUUID();
     const expires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
-    db.prepare(
-      "UPDATE users SET verify_otp = ?, otp_expires = ?, updated_at = ? WHERE email = ?"
-    ).run(token, expires, new Date().toISOString(), email.toLowerCase().trim());
+    await sb
+      .from("users")
+      .update({ verify_otp: token, otp_expires: expires, updated_at: new Date().toISOString() })
+      .eq("email", email.toLowerCase().trim());
 
     // Build the activation URL pointing at the frontend
     const frontendUrl = process.env.FRONTEND_URL || "https://budgetbuddy1.vercel.app";
@@ -219,21 +233,26 @@ router.post("/send-activation-email", async (req, res) => {
 // Validates the activation token and marks the user as verified.
 // Called by the frontend /verify-email page when the user clicks the link.
 // ---------------------------------------------------------------------------
-router.get("/activate-email", (req, res) => {
+router.get("/activate-email", async (req, res) => {
   try {
     const token = (req.query.token || "").toString().trim();
     if (!token) return res.status(400).json({ success: false, error: "token is required" });
 
-    const db   = getDb();
-    const user = db.prepare("SELECT * FROM users WHERE verify_otp = ?").get(token);
+    const sb = getDb();
+    const { data: user } = await sb
+      .from("users")
+      .select("*")
+      .eq("verify_otp", token)
+      .maybeSingle();
 
-    if (!user)                           return res.status(400).json({ success: false, error: "Invalid or expired activation link." });
-    if (user.is_verified === 1)          return res.status(200).json({ success: true,  message: "Email already verified." });
-    if (new Date(user.otp_expires) < new Date()) return res.status(400).json({ success: false, error: "Activation link has expired. Please request a new one." });
+    if (!user)                                          return res.status(400).json({ success: false, error: "Invalid or expired activation link." });
+    if (user.is_verified === true)                      return res.status(200).json({ success: true,  message: "Email already verified." });
+    if (new Date(user.otp_expires) < new Date())        return res.status(400).json({ success: false, error: "Activation link has expired. Please request a new one." });
 
-    db.prepare(
-      "UPDATE users SET is_verified = 1, verify_otp = NULL, otp_expires = NULL, updated_at = ? WHERE id = ?"
-    ).run(new Date().toISOString(), user.id);
+    await sb
+      .from("users")
+      .update({ is_verified: true, verify_otp: null, otp_expires: null, updated_at: new Date().toISOString() })
+      .eq("id", user.id);
 
     return res.status(200).json({ success: true, message: "Email verified successfully! You can now close this page." });
   } catch (err) {
@@ -249,19 +268,24 @@ router.get("/activate-email", (req, res) => {
 // the verification outcome in SQLite.
 // Protected by verifyToken — requires valid Firebase JWT.
 // ---------------------------------------------------------------------------
-router.post("/mark-phone-verified", verifyToken, (req, res) => {
+router.post("/mark-phone-verified", verifyToken, async (req, res) => {
   try {
     const firebaseUid = req.user.uid;
-    const db = getDb();
-    const user = db.prepare("SELECT * FROM users WHERE firebase_uid = ?").get(firebaseUid);
+    const sb = getDb();
+    const { data: user } = await sb
+      .from("users")
+      .select("id")
+      .eq("firebase_uid", firebaseUid)
+      .maybeSingle();
 
     if (!user) {
       return res.status(404).json({ success: false, error: "User profile not found." });
     }
 
-    db.prepare(
-      "UPDATE users SET is_phone_verified = 1, updated_at = ? WHERE firebase_uid = ?"
-    ).run(new Date().toISOString(), firebaseUid);
+    await sb
+      .from("users")
+      .update({ is_phone_verified: true, updated_at: new Date().toISOString() })
+      .eq("firebase_uid", firebaseUid);
 
     return res.status(200).json({ success: true, message: "Phone number verified successfully!" });
   } catch (err) {
@@ -279,7 +303,7 @@ router.post("/mark-phone-verified", verifyToken, (req, res) => {
 //
 // Body: { phone }  (E.164 format, e.g. "+919876543210")
 // ---------------------------------------------------------------------------
-router.patch("/update-phone", verifyToken, (req, res) => {
+router.patch("/update-phone", verifyToken, async (req, res) => {
   try {
     const firebaseUid = req.user.uid;
     const { phone }   = req.body;
@@ -288,24 +312,34 @@ router.patch("/update-phone", verifyToken, (req, res) => {
       return res.status(400).json({ success: false, error: "A valid phone number is required." });
     }
 
-    const db  = getDb();
+    const sb  = getDb();
     const now = new Date().toISOString();
-    const user = db.prepare("SELECT id FROM users WHERE firebase_uid = ?").get(firebaseUid);
+    const { data: user } = await sb
+      .from("users")
+      .select("id")
+      .eq("firebase_uid", firebaseUid)
+      .maybeSingle();
 
     if (!user) {
-      // Profile not created yet (e.g. first Google login before firebase-login synced).
-      // Create it now using JWT claims so the phone can be saved immediately.
+      // Profile not created yet — create a minimal row using JWT claims
       const { email, name: tokenName } = req.user;
       const resolvedName  = tokenName || (email ? email.split("@")[0] : "User");
       const resolvedEmail = email || null;
-      db.prepare(`
-        INSERT INTO users (id, firebase_uid, name, email, phone, is_phone_verified, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, 1, ?, ?)
-      `).run(randomUUID(), firebaseUid, resolvedName, resolvedEmail, phone.trim(), now, now);
+      const { error: insertErr } = await sb.from("users").insert({
+        firebase_uid:      firebaseUid,
+        name:              resolvedName,
+        email:             resolvedEmail,
+        phone:             phone.trim(),
+        is_phone_verified: true,
+        created_at:        now,
+        updated_at:        now,
+      });
+      if (insertErr) throw new Error(insertErr.message);
     } else {
-      db.prepare(
-        "UPDATE users SET phone = ?, is_phone_verified = 1, updated_at = ? WHERE firebase_uid = ?"
-      ).run(phone.trim(), now, firebaseUid);
+      await sb
+        .from("users")
+        .update({ phone: phone.trim(), is_phone_verified: true, updated_at: now })
+        .eq("firebase_uid", firebaseUid);
     }
 
     return res.status(200).json({ success: true, message: "Phone number updated successfully." });
@@ -323,29 +357,39 @@ router.patch("/update-phone", verifyToken, (req, res) => {
 //
 // Body: { phone?: string, currency?: string }
 // ---------------------------------------------------------------------------
-router.put("/setup", verifyToken, (req, res) => {
+router.put("/setup", verifyToken, async (req, res) => {
   try {
     const { phone, currency } = req.body;
-    const db  = getDb();
+    const sb  = getDb();
     const now = new Date().toISOString();
     const uid = req.user.uid;
 
-    const user = db.prepare("SELECT id FROM users WHERE firebase_uid = ?").get(uid);
+    const { data: user } = await sb
+      .from("users")
+      .select("id")
+      .eq("firebase_uid", uid)
+      .maybeSingle();
+
     if (!user) {
       // Row not yet created — create a minimal one so subsequent updates work.
       const { email, name: tokenName } = req.user;
       const resolvedName  = tokenName || (email ? email.split("@")[0] : "User");
       const resolvedEmail = email || null;
-      db.prepare(`
-        INSERT INTO users (id, firebase_uid, name, email, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `).run(randomUUID(), uid, resolvedName, resolvedEmail, now, now);
+      const { error: insertErr } = await sb.from("users").insert({
+        firebase_uid: uid,
+        name:         resolvedName,
+        email:        resolvedEmail,
+        created_at:   now,
+        updated_at:   now,
+      });
+      if (insertErr) throw new Error(insertErr.message);
     }
 
     if (phone && typeof phone === "string" && phone.trim().length >= 5) {
-      db.prepare(
-        "UPDATE users SET phone = ?, updated_at = ? WHERE firebase_uid = ?"
-      ).run(phone.trim(), now, uid);
+      await sb
+        .from("users")
+        .update({ phone: phone.trim(), updated_at: now })
+        .eq("firebase_uid", uid);
     }
     // currency is stored client-side; backend simply acknowledges.
 

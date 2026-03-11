@@ -1,153 +1,62 @@
 ﻿"use strict";
 
-// ── Local SQLite database (better-sqlite3) ─────────────────────────────────
-// Stores data in server/data/budget.db — no network, never pauses, free forever.
+// ── Supabase / PostgreSQL database layer ──────────────────────────────────
+// Replaces the previous better-sqlite3 / SQLite implementation.
+// Uses @supabase/supabase-js with the SERVICE ROLE key so every query
+// bypasses Row-Level Security — auth is enforced by the Firebase verifyToken
+// middleware on every Express route.
+//
+// Required env vars (add in Render dashboard → Environment):
+//   SUPABASE_URL              = https://mggvdhdjkszehutfhmbl.supabase.co
+//   SUPABASE_SERVICE_ROLE_KEY = <service_role secret from Supabase → Settings → API>
 
-const Database       = require("better-sqlite3");
-const path           = require("path");
-const fs             = require("fs");
-const { randomUUID } = require("crypto");
+const { createClient } = require("@supabase/supabase-js");
+const { randomUUID }   = require("crypto");
 
-// ── Storage setup ──────────────────────────────────────────────────────────
-// Priority order for the data directory:
-//   1. DATA_DIR env var (explicit override)
-//   2. /var/data (Render persistent disk — only when actually mounted)
-//   3. server/data/ (always-writable local fallback)
-function resolveDataDir() {
-  const candidates = [
-    process.env.DATA_DIR,
-    process.env.NODE_ENV === "production" ? "/var/data" : null,
-    path.join(__dirname, "..", "data"),
-  ].filter(Boolean);
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  for (const dir of candidates) {
-    try {
-      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-      // Verify write access
-      const probe = path.join(dir, ".write-probe");
-      fs.writeFileSync(probe, "ok");
-      fs.unlinkSync(probe);
-      console.log("[db] Data directory:", dir);
-      return dir;
-    } catch (err) {
-      console.warn("[db] Cannot use data directory:", dir, "—", err.message);
-    }
-  }
-  throw new Error("[db] No writable data directory available");
+if (!SUPABASE_URL || !SUPABASE_KEY) {
+  console.error(
+    "[db] FATAL: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set.\n" +
+    "     Get them from: Supabase → project → Settings → API"
+  );
+  process.exit(1);
 }
 
-const DATA_DIR = resolveDataDir();
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: { persistSession: false },
+});
+console.log("[db] Supabase client ready →", SUPABASE_URL);
 
-const DB_PATH = path.join(DATA_DIR, "budget.db");
+// getDb() returns the raw Supabase client for routes that need direct queries.
+function getDb() { return supabase; }
 
-let _db = null;
-function getDb() {
-  if (_db) return _db;
-  _db = new Database(DB_PATH);
-  _db.pragma("journal_mode = WAL");
-  _db.pragma("foreign_keys = ON");
-  initSchema(_db);
-  console.log("[db] SQLite ready →", DB_PATH);
-  return _db;
-}
 
-function initSchema(db) {
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS transactions (
-      id                TEXT PRIMARY KEY,
-      uid               TEXT NOT NULL,
-      type              TEXT NOT NULL DEFAULT 'expense',
-      amount            REAL NOT NULL DEFAULT 0,
-      category          TEXT,
-      description       TEXT,
-      date              TEXT NOT NULL,
-      needs_review      INTEGER NOT NULL DEFAULT 0,
-      bank_reference_id TEXT,
-      ai_categorized    INTEGER NOT NULL DEFAULT 0,
-      created_at        TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-    CREATE INDEX IF NOT EXISTS transactions_uid_idx
-      ON transactions (uid);
-    CREATE INDEX IF NOT EXISTS transactions_uid_date_idx
-      ON transactions (uid, date DESC);
-    CREATE UNIQUE INDEX IF NOT EXISTS transactions_uid_bankref_idx
-      ON transactions (uid, bank_reference_id)
-      WHERE bank_reference_id IS NOT NULL;
-
-    CREATE TABLE IF NOT EXISTS budgets (
-      id              TEXT PRIMARY KEY,
-      uid             TEXT NOT NULL UNIQUE,
-      monthly_limit   REAL NOT NULL DEFAULT 0,
-      alert_threshold REAL NOT NULL DEFAULT 80,
-      updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-
-    CREATE TABLE IF NOT EXISTS users (
-      id              TEXT PRIMARY KEY,
-      firebase_uid    TEXT NOT NULL UNIQUE,
-      name            TEXT NOT NULL,
-      email           TEXT NOT NULL,
-      phone           TEXT,
-      is_verified     INTEGER NOT NULL DEFAULT 0,
-      verify_otp      TEXT,
-      otp_expires     TEXT,
-      created_at      TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-    CREATE INDEX IF NOT EXISTS users_firebase_uid_idx
-      ON users (firebase_uid);
-
-    -- Temporary phone OTPs — keyed by E.164 phone number.
-    -- Stores the 6-digit code and its expiry while the user completes verification.
-    -- Row is deleted on successful verification or replaced on resend.
-    CREATE TABLE IF NOT EXISTS phone_otps (
-      phone      TEXT PRIMARY KEY,
-      otp        TEXT NOT NULL,
-      expires_at TEXT NOT NULL,
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-
-    -- Migration: add OTP columns to existing databases that lack them
-    CREATE TEMPORARY TABLE IF NOT EXISTS _col_check (dummy TEXT);
-    DROP TABLE _col_check;
-  `);
-
-  // Safe column migrations for databases created before OTP support
-  for (const stmt of [
-    "ALTER TABLE users ADD COLUMN is_verified       INTEGER NOT NULL DEFAULT 0",
-    "ALTER TABLE users ADD COLUMN verify_otp        TEXT",
-    "ALTER TABLE users ADD COLUMN otp_expires       TEXT",
-    "ALTER TABLE users ADD COLUMN is_phone_verified INTEGER NOT NULL DEFAULT 0",
-  ]) {
-    try { db.exec(stmt); } catch (_) { /* column already exists */ }
-  }
-
-  // Safe column migrations for loan support
-  for (const stmt of [
-    "ALTER TABLE transactions ADD COLUMN borrower_name    TEXT",
-    "ALTER TABLE transactions ADD COLUMN due_date         TEXT",
-    "ALTER TABLE transactions ADD COLUMN repaid_amount    REAL NOT NULL DEFAULT 0",
-    "ALTER TABLE transactions ADD COLUMN remaining_amount REAL",
-    "ALTER TABLE transactions ADD COLUMN loan_status      TEXT NOT NULL DEFAULT 'PENDING'",
-  ]) {
-    try { db.exec(stmt); } catch (_) { /* column already exists */ }
-  }
-}
 
 // ── Column name mappings ───────────────────────────────────────────────────
 const APP_TO_DB = {
-  _id:             "id",
-  needsReview:     "needs_review",
-  bankReferenceId: "bank_reference_id",
-  aiCategorized:   "ai_categorized",
-  monthlyLimit:    "monthly_limit",
-  alertThreshold:  "alert_threshold",
-  createdAt:       "created_at",  // Loan fields
-  borrowerName:    "borrower_name",
-  dueDate:         "due_date",
-  repaidAmount:    "repaid_amount",
-  remainingAmount: "remaining_amount",
-  loanStatus:      "loan_status",};
+  _id:              "id",
+  needsReview:      "needs_review",
+  bankReferenceId:  "bank_reference_id",
+  aiCategorized:    "ai_categorized",
+  monthlyLimit:     "monthly_limit",
+  alertThreshold:   "alert_threshold",
+  createdAt:        "created_at",
+  firebaseUid:      "firebase_uid",
+  isVerified:       "is_verified",
+  verifyOtp:        "verify_otp",
+  otpExpires:       "otp_expires",
+  isPhoneVerified:  "is_phone_verified",
+  updatedAt:        "updated_at",
+  expiresAt:        "expires_at",
+  // Loan fields
+  borrowerName:     "borrower_name",
+  dueDate:          "due_date",
+  repaidAmount:     "repaid_amount",
+  remainingAmount:  "remaining_amount",
+  loanStatus:       "loan_status",
+};
 const DB_TO_APP = Object.fromEntries(
   Object.entries(APP_TO_DB).map(([a, d]) => [d, a])
 );
@@ -158,8 +67,7 @@ function fromRow(row) {
   if (!row) return null;
   const out = {};
   for (const [k, v] of Object.entries(row)) {
-    const ak = DB_TO_APP[k] || k;
-    out[ak] = (k === "needs_review" || k === "ai_categorized") ? v === 1 : v;
+    out[DB_TO_APP[k] || k] = v;
   }
   return out;
 }
@@ -167,142 +75,132 @@ function fromRow(row) {
 function toRow(obj) {
   const row = {};
   for (const [k, v] of Object.entries(obj)) {
-    row[dbCol(k)] = typeof v === "boolean" ? (v ? 1 : 0) : v;
+    if (v !== undefined) row[dbCol(k)] = v;
   }
   return row;
 }
 
-function buildWhere(filter) {
-  const keys = Object.keys(filter);
-  if (keys.length === 0) return { clause: "", params: [] };
-  const parts  = keys.map(k => `${dbCol(k)} = ?`);
-  const params = keys.map(k => {
-    const v = filter[k];
-    return typeof v === "boolean" ? (v ? 1 : 0) : v;
-  });
-  return { clause: "WHERE " + parts.join(" AND "), params };
+// Apply a filter object as .eq() chains on a Supabase query builder
+function applyFilter(query, filter) {
+  for (const [k, v] of Object.entries(filter)) {
+    query = query.eq(dbCol(k), v);
+  }
+  return query;
 }
 
-// ── Public API (all async to match existing route code) ────────────────────
+// Apply sort — default: date DESC, id DESC
+function applySort(query, sort) {
+  if (!sort || Object.keys(sort).length === 0) {
+    return query.order("date", { ascending: false }).order("id", { ascending: false });
+  }
+  for (const [k, dir] of Object.entries(sort)) {
+    query = query.order(dbCol(k), { ascending: dir !== -1 && dir !== "desc" });
+  }
+  return query;
+}
+
+function assertOk({ error }, context) {
+  if (error) {
+    console.error(`[db] Supabase error (${context}):`, error);
+    throw new Error(`${context}: ${error.message}`);
+  }
+}
+
+// ── Public API ─────────────────────────────────────────────────────────────
 
 async function find(coll, filter = {}, opts = {}) {
-  const db = getDb();
-  const { clause, params } = buildWhere(filter);
+  // Count
+  let cntQ = supabase.from(coll).select("*", { count: "exact", head: true });
+  cntQ = applyFilter(cntQ, filter);
+  const { count: total, error: cntErr } = await cntQ;
+  if (cntErr) throw new Error(`find/count ${coll}: ${cntErr.message}`);
 
-  const total = db.prepare(`SELECT COUNT(*) AS n FROM ${coll} ${clause}`)
-                  .get(...params).n;
-
-  let orderBy = "ORDER BY date DESC, id DESC";
-  if (opts.sort) {
-    const parts = Object.entries(opts.sort).map(
-      ([k, dir]) => `${dbCol(k)} ${dir === -1 || dir === "desc" ? "DESC" : "ASC"}`
-    );
-    if (parts.length) orderBy = "ORDER BY " + parts.join(", ");
+  // Data
+  let dataQ = supabase.from(coll).select("*");
+  dataQ = applyFilter(dataQ, filter);
+  dataQ = applySort(dataQ, opts.sort);
+  if (opts.limit) {
+    const lim  = Number(opts.limit);
+    const skip = Number(opts.skip) || 0;
+    dataQ = dataQ.range(skip, skip + lim - 1);
   }
-
-  let limitClause = "";
-  if (opts.limit) limitClause += ` LIMIT ${Number(opts.limit)}`;
-  if (opts.skip)  limitClause += ` OFFSET ${Number(opts.skip)}`;
-
-  const rows = db.prepare(
-    `SELECT * FROM ${coll} ${clause} ${orderBy}${limitClause}`
-  ).all(...params);
-
-  return { docs: rows.map(fromRow), total };
+  const { data, error } = await dataQ;
+  assertOk({ error }, `find ${coll}`);
+  return { docs: (data || []).map(fromRow), total: total || 0 };
 }
 
 async function count(coll, filter = {}) {
-  const db = getDb();
-  const { clause, params } = buildWhere(filter);
-  return db.prepare(`SELECT COUNT(*) AS n FROM ${coll} ${clause}`)
-           .get(...params).n;
+  let q = supabase.from(coll).select("*", { count: "exact", head: true });
+  q = applyFilter(q, filter);
+  const { count: n, error } = await q;
+  assertOk({ error }, `count ${coll}`);
+  return n || 0;
 }
 
 async function findOne(coll, filter = {}) {
-  const db = getDb();
-  const { clause, params } = buildWhere(filter);
-  return fromRow(
-    db.prepare(`SELECT * FROM ${coll} ${clause} LIMIT 1`).get(...params)
-  );
+  let q = supabase.from(coll).select("*");
+  q = applyFilter(q, filter);
+  const { data, error } = await q.limit(1).maybeSingle();
+  assertOk({ error }, `findOne ${coll}`);
+  return fromRow(data);
 }
 
 async function insertOne(coll, doc) {
-  const db  = getDb();
-  const row = toRow({ ...doc, _id: doc._id || randomUUID() });
-  const keys = Object.keys(row);
-  const phs  = keys.map(() => "?").join(", ");
-  db.prepare(`INSERT INTO ${coll} (${keys.join(", ")}) VALUES (${phs})`)
-    .run(...keys.map(k => row[k]));
-  return fromRow(db.prepare(`SELECT * FROM ${coll} WHERE id = ?`).get(row.id));
+  const row = toRow({ ...doc, _id: doc._id || doc.id || randomUUID() });
+  const { data, error } = await supabase.from(coll).insert(row).select().single();
+  assertOk({ error }, `insertOne ${coll}`);
+  return fromRow(data);
 }
 
 async function insertMany(coll, docs) {
-  const db = getDb();
-  const results = db.transaction((items) => {
-    const out = [];
-    for (const doc of items) {
-      const row  = toRow({ ...doc, _id: doc._id || randomUUID() });
-      const keys = Object.keys(row);
-      const phs  = keys.map(() => "?").join(", ");
-      db.prepare(
-        `INSERT OR IGNORE INTO ${coll} (${keys.join(", ")}) VALUES (${phs})`
-      ).run(...keys.map(k => row[k]));
-      out.push(fromRow(db.prepare(`SELECT * FROM ${coll} WHERE id = ?`).get(row.id)));
-    }
-    return out;
-  })(docs);
-  return results;
+  const rows = docs.map((doc) => toRow({ ...doc, _id: doc._id || doc.id || randomUUID() }));
+  const { data, error } = await supabase
+    .from(coll)
+    .upsert(rows, { onConflict: "id", ignoreDuplicates: true })
+    .select();
+  assertOk({ error }, `insertMany ${coll}`);
+  return (data || []).map(fromRow);
 }
 
 async function updateOne(coll, filter, update) {
-  const db = getDb();
-  const { clause, params } = buildWhere(filter);
-  const setRow   = toRow(update.$set || update);
-  const setParts = Object.keys(setRow).map(k => `${k} = ?`);
-  const info = db.prepare(
-    `UPDATE ${coll} SET ${setParts.join(", ")} ${clause}`
-  ).run(...Object.values(setRow), ...params);
-  return { modifiedCount: info.changes };
+  const setRow = toRow(update.$set || update);
+  let q = supabase.from(coll).update(setRow);
+  q = applyFilter(q, filter);
+  const { error } = await q;
+  assertOk({ error }, `updateOne ${coll}`);
+  return { modifiedCount: 1 };
 }
 
 async function findOneAndUpdate(coll, filter, update) {
-  const db = getDb();
-  const { clause, params } = buildWhere(filter);
+  const setRow = toRow(update.$set || update);
   const existing = db.prepare(`SELECT id FROM ${coll} ${clause} LIMIT 1`).get(...params);
   if (!existing) return null;
   const setRow   = toRow(update.$set || update);
-  const setParts = Object.keys(setRow).map(k => `${k} = ?`);
-  db.prepare(`UPDATE ${coll} SET ${setParts.join(", ")} WHERE id = ?`)
-    .run(...Object.values(setRow), existing.id);
-  return fromRow(db.prepare(`SELECT * FROM ${coll} WHERE id = ?`).get(existing.id));
+  let q = supabase.from(coll).update(setRow);
+  q = applyFilter(q, filter);
+  const { data, error } = await q.select().maybeSingle();
+  assertOk({ error }, `findOneAndUpdate ${coll}`);
+  return fromRow(data);
 }
 
 async function findOneAndDelete(coll, filter) {
-  const db = getDb();
-  const { clause, params } = buildWhere(filter);
-  const row = db.prepare(`SELECT * FROM ${coll} ${clause} LIMIT 1`).get(...params);
-  if (!row) return null;
-  db.prepare(`DELETE FROM ${coll} WHERE id = ?`).run(row.id);
-  return fromRow(row);
+  const existing = await findOne(coll, filter);
+  if (!existing) return null;
+  const id = existing._id || existing.id;
+  const { error } = await supabase.from(coll).delete().eq("id", id);
+  assertOk({ error }, `findOneAndDelete ${coll}`);
+  return existing;
 }
 
 async function upsertByUid(coll, uid, data) {
-  const db  = getDb();
-  const row = toRow(data);
-  const existing = db.prepare(`SELECT id FROM ${coll} WHERE uid = ?`).get(uid);
-  if (existing) {
-    const setParts = Object.keys(row).map(k => `${k} = ?`);
-    db.prepare(
-      `UPDATE ${coll} SET ${setParts.join(", ")}, updated_at = datetime('now') WHERE uid = ?`
-    ).run(...Object.values(row), uid);
-  } else {
-    const newRow = { id: randomUUID(), uid, updated_at: new Date().toISOString(), ...row };
-    const keys   = Object.keys(newRow);
-    const phs    = keys.map(() => "?").join(", ");
-    db.prepare(`INSERT INTO ${coll} (${keys.join(", ")}) VALUES (${phs})`)
-      .run(...keys.map(k => newRow[k]));
-  }
-  return fromRow(db.prepare(`SELECT * FROM ${coll} WHERE uid = ?`).get(uid));
+  const row = { id: randomUUID(), uid, updated_at: new Date().toISOString(), ...toRow(data) };
+  const { data: result, error } = await supabase
+    .from(coll)
+    .upsert(row, { onConflict: "uid" })
+    .select()
+    .single();
+  assertOk({ error }, `upsertByUid ${coll}`);
+  return fromRow(result);
 }
 
 // Accepts both (uid, refIds) and legacy (coll, uid, refIds)
@@ -310,12 +208,13 @@ async function existingRefIds(collOrUid, uidOrRefIds, maybeRefIds) {
   const uid    = maybeRefIds !== undefined ? uidOrRefIds : collOrUid;
   const refIds = maybeRefIds !== undefined ? maybeRefIds  : uidOrRefIds;
   if (!refIds || refIds.length === 0) return new Set();
-  const db  = getDb();
-  const phs = refIds.map(() => "?").join(", ");
-  const rows = db.prepare(
-    `SELECT bank_reference_id FROM transactions WHERE uid = ? AND bank_reference_id IN (${phs})`
-  ).all(uid, ...refIds);
-  return new Set(rows.map(r => r.bank_reference_id));
+  const { data, error } = await supabase
+    .from("transactions")
+    .select("bank_reference_id")
+    .eq("uid", uid)
+    .in("bank_reference_id", refIds);
+  assertOk({ error }, "existingRefIds");
+  return new Set((data || []).map((r) => r.bank_reference_id));
 }
 
 module.exports = {

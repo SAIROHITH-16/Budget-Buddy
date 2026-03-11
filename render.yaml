@@ -1,22 +1,16 @@
 # render.yaml — Render deployment configuration
 # Docs: https://render.com/docs/infrastructure-as-code
 #
-# This file explicitly configures the Express backend as a Node.js service.
-# Without it, Render detects the root-level bun.lockb (used by the Vite
-# frontend) and defaults to Bun — which cannot load better-sqlite3 (native addon).
+# Backend uses Supabase Postgres so no local disk is required.
 
 services:
   - type: web
     name: budget-buddy-server
-    runtime: node          # Force Node.js — never Bun
-    rootDir: server        # All commands run from the server/ subdirectory
+    runtime: node
+    rootDir: server
     buildCommand: npm install
     startCommand: node index.js
     healthCheckPath: /health
-    disk:
-      name: budget-buddy-storage
-      mountPath: /var/data   # Persisted across deploys and restarts
-      sizeGB: 1
     envVars:
       - key: NODE_ENV
         value: production
