@@ -15,12 +15,12 @@ import {
 
 const CATEGORIES = ["Uncategorized", "Salary", "Freelance", "Rent", "Groceries", "Utilities", "Transport", "Entertainment", "Health", "Other"];
 
-// Base schema for income / expense
+// Base schema for income / expense — description is optional
 const baseSchema = z.object({
   type:        z.enum(["income", "expense", "lent", "repaid"]),
   amount:      z.number().positive("Amount must be positive"),
   category:    z.string().min(1, "Category is required"),
-  description: z.string().trim().min(1, "Description is required").max(200),
+  description: z.string().trim().max(200).optional().default(""),
   date:        z.string().min(1, "Date is required"),
 });
 
@@ -231,21 +231,17 @@ export function TransactionForm({ onSubmit }: TransactionFormProps) {
       <div>
         <Label htmlFor="description">
           {isLoan ? "Reason for loan" : "Description"}
-          {isLoan && <span className="ml-1 text-xs text-muted-foreground font-normal">(optional)</span>}
+          <span className="ml-1 text-xs text-muted-foreground font-normal">(optional)</span>
         </Label>
         <Input
           id="description"
-          placeholder={isLoan ? "e.g., Reason for loan (optional)" : "What was this for?"}
+          placeholder={isLoan ? "e.g., Reason for loan" : "What was this for?"}
           value={form.description}
           onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
           maxLength={200}
         />
         {errors.description && <p className="text-xs expense-text mt-1">{errors.description}</p>}
       </div>
-
-      <Button type="submit" className="w-full">
-        {isLoan ? "Record Loan" : "Add Transaction"}
-      </Button>
 
       {/* ---- Loan-specific fields ---- */}
       {isLoan && (
@@ -272,6 +268,10 @@ export function TransactionForm({ onSubmit }: TransactionFormProps) {
           </div>
         </div>
       )}
+
+      <Button type="submit" className="w-full">
+        {isLoan ? "Record Loan" : "Add Transaction"}
+      </Button>
     </form>
   );
 }
