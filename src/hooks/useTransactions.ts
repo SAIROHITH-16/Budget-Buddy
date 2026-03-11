@@ -120,23 +120,10 @@ export function useTransactions(options: UseTransactionsOptions = {}) {
 
       const qs = params.toString();
       const url = `/transactions${qs ? `?${qs}` : ""}`;
-      console.log("[useTransactions] 3. Fetching:", url);
 
       const response = await api.get<TransactionsPage>(url);
 
-      // ── CHECKPOINT 3: Raw API response ───────────────────────────────────
-      console.log("[useTransactions] 4. Raw response status:", response.status);
-      console.log("[useTransactions] 5. totalRecords:", response.data.totalRecords,
-        "| totalPages:", response.data.totalPages,
-        "| data.length:", response.data.data?.length ?? "undefined");
-      if (response.data.data?.length > 0) {
-        console.log("[useTransactions] 6. Sample record[0]:", JSON.stringify(response.data.data[0]));
-      } else {
-        console.warn("[useTransactions] 6. data array is EMPTY — server returned 0 transactions");
-      }
-
       const mapped = response.data.data.map(mapRawToTransaction);
-      console.log("[useTransactions] 7. Mapped", mapped.length, "transactions into state");
       setTransactions(mapped);
       setTotalRecords(response.data.totalRecords);
       setTotalPages(response.data.totalPages);
@@ -147,9 +134,6 @@ export function useTransactions(options: UseTransactionsOptions = {}) {
           ?.response?.data?.message ??
         (e as { message?: string })?.message ??
         "Failed to fetch transactions.";
-      // ── CHECKPOINT 4: Fetch error ─────────────────────────────────────────
-      console.error("[useTransactions] 8. FETCH ERROR:",
-        (e as { response?: unknown })?.response ?? (e as Error)?.message ?? e);
       setError(msg);
     } finally {
       setLoading(false);

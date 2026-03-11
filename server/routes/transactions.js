@@ -70,9 +70,6 @@ router.use(verifyToken);
 // ---------------------------------------------------------------------------
 router.get("/", async (req, res) => {
   try {
-    // ── CHECKPOINT 1: Auth ───────────────────────────────────────────────────
-    console.log("[GET /transactions] 1. User ID from token:", req.user?.uid ?? "MISSING");
-
     const page  = Math.max(1, parseInt(req.query.page,  10) || 1);
     // Allow callers (e.g. Dashboard totals) to request up to 10 000 records at once.
     // Default stays 20 for paginated list views.
@@ -86,20 +83,11 @@ router.get("/", async (req, res) => {
     if (req.query.type && validTypes.includes(req.query.type)) {
       firestoreFilter.type = req.query.type;
     }
-    console.log("[GET /transactions] 2. Query filter:", firestoreFilter, "| page:", page, "limit:", limit);
 
     // Fetch all matching docs sorted by date desc, then filter in memory
     const { docs: allDocs } = await db.find(TX_COLL, firestoreFilter, {
       sort: { date: -1, _id: -1 },
     });
-    // ── CHECKPOINT 2: DB result ───────────────────────────────────────────────
-    console.log("[GET /transactions] 3. Total rows from DB:", allDocs.length);
-    if (allDocs.length > 0) {
-      console.log("[GET /transactions] 4. Sample row[0]:", JSON.stringify(allDocs[0]));
-    } else {
-      console.warn("[GET /transactions] 4. DB returned 0 rows for uid:", req.user.uid,
-        "— database may be empty (ephemeral filesystem reset on last redeploy)");
-    }
 
     // In-memory filters
     const searchTerm  = req.query.search?.trim().toLowerCase()  || "";
@@ -122,7 +110,6 @@ router.get("/", async (req, res) => {
 
     const totalRecords = filtered.length;
     const data         = filtered.slice(skip, skip + limit);
-    console.log("[GET /transactions] 5. After filters:", totalRecords, "records, returning page slice:", data.length);
 
     return res.status(200).json({
       data,

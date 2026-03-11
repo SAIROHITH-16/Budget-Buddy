@@ -11,7 +11,6 @@
 
 const express          = require("express");
 const { createHmac, randomInt } = require("crypto");
-const { randomUUID }   = require("crypto");
 const { adminAuth }    = require("../firebaseAdmin");
 const { getDb }        = require("../lib/db");
 const verifyToken      = require("../middleware/verifyToken");
