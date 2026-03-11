@@ -21,8 +21,13 @@ const baseSchema = z.object({
   date:        z.string().min(1, "Date is required"),
 });
 
-// Extended schema for loan transactions
-const loanSchema = baseSchema.extend({
+// Extended schema for loan transactions — category is auto-set, description optional
+const loanSchema = z.object({
+  type:         z.enum(["income", "expense", "lent", "repaid"]),
+  amount:       z.number().positive("Amount must be positive"),
+  category:     z.string().optional().default("Loan"),
+  description:  z.string().trim().max(200).optional().default(""),
+  date:         z.string().min(1, "Date is required"),
   borrowerName: z.string().trim().min(1, "Friend's name is required"),
   dueDate:      z.string().min(1, "Expected return date is required"),
 });
@@ -100,7 +105,11 @@ export function TransactionForm({ onSubmit }: TransactionFormProps) {
       setErrors(fieldErrors);
       return;
     }
-    onSubmit(parsed.data as Omit<Transaction, "id">);
+    // For loans: inject the auto-set category before passing upstream
+    const payload = isLoan
+      ? { ...parsed.data, category: "Loan", description: parsed.data.description || "Loan" }
+      : parsed.data;
+    onSubmit(payload as Omit<Transaction, "id">);
     setIsLoan(false);
     setForm({
       type: "expense",
@@ -188,42 +197,48 @@ export function TransactionForm({ onSubmit }: TransactionFormProps) {
         </div>
       </div>
 
-      <div>
-        <div className="flex items-center justify-between mb-1">
-          <Label htmlFor="category">Category</Label>
-          <button
-            type="button"
-            onClick={autoCategorize}
-            disabled={!form.description.trim() || categorizing}
-            className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+      {/* ---- Category (hidden for loans — auto-set to "Loan") ---- */}
+      {!isLoan && (
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <Label htmlFor="category">Category</Label>
+            <button
+              type="button"
+              onClick={autoCategorize}
+              disabled={!form.description.trim() || categorizing}
+              className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              {categorizing ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <Sparkles className="h-3 w-3" />
+              )}
+              Auto
+            </button>
+          </div>
+          <select
+            id="category"
+            value={form.category}
+            onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
+            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            {categorizing ? (
-              <Loader2 className="h-3 w-3 animate-spin" />
-            ) : (
-              <Sparkles className="h-3 w-3" />
-            )}
-            Auto
-          </button>
+            <option value="">Select category</option>
+            {CATEGORIES.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+          {errors.category && <p className="text-xs expense-text mt-1">{errors.category}</p>}
         </div>
-        <select
-          id="category"
-          value={form.category}
-          onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
-          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          <option value="">Select category</option>
-          {CATEGORIES.map((c) => (
-            <option key={c} value={c}>{c}</option>
-          ))}
-        </select>
-        {errors.category && <p className="text-xs expense-text mt-1">{errors.category}</p>}
-      </div>
+      )}
 
       <div>
-        <Label htmlFor="description">Description</Label>
+        <Label htmlFor="description">
+          {isLoan ? "Reason for loan" : "Description"}
+          {isLoan && <span className="ml-1 text-xs text-muted-foreground font-normal">(optional)</span>}
+        </Label>
         <Input
           id="description"
-          placeholder="What was this for?"
+          placeholder={isLoan ? "e.g., Reason for loan (optional)" : "What was this for?"}
           value={form.description}
           onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
           maxLength={200}

@@ -11,7 +11,7 @@ import { formatCurrency, groupTransactionsByDate } from "@/utils/calculations";
 import type { Transaction } from "@/utils/calculations";
 import {
   Pencil, Trash2, ArrowUpRight, ArrowDownRight, Receipt,
-  Search, ChevronLeft, ChevronRight, X, CalendarIcon, Upload,
+  Search, ChevronLeft, ChevronRight, X, CalendarIcon, Upload, HandCoins,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -63,7 +63,7 @@ const Transactions = () => {
   // Filter state
   const [search, setSearch]       = useState("");
   const [category, setCategory]   = useState("");
-  const [type, setType]           = useState<"" | "income" | "expense">("");
+  const [type, setType]           = useState<"" | "income" | "expense" | "lent" | "repaid">("");;
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate]     = useState("");
   const [page, setPage]           = useState(1);
@@ -170,15 +170,17 @@ const Transactions = () => {
 
                 <Select
                   value={type || "_all"}
-                  onValueChange={(v) => { setType(v === "_all" ? "" : v as "income" | "expense"); setPage(1); }}
+                  onValueChange={(v) => { setType(v === "_all" ? "" : v as "income" | "expense" | "lent" | "repaid"); setPage(1); }}
                 >
-                  <SelectTrigger className="h-9 w-[130px] text-sm">
+                  <SelectTrigger className="h-9 w-[170px] text-sm">
                     <SelectValue placeholder="All types" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="_all">All types</SelectItem>
                     <SelectItem value="income">Income</SelectItem>
                     <SelectItem value="expense">Expense</SelectItem>
+                    <SelectItem value="lent">Loans Given</SelectItem>
+                    <SelectItem value="repaid">Repayments Received</SelectItem>
                   </SelectContent>
                 </Select>
 
@@ -308,44 +310,95 @@ const Transactions = () => {
                 </div>
 
                 {/* Transaction cards for this date */}
-                {group.transactions.map((tx) => (
-                  <div
-                    key={tx.id}
-                    className="glass-card p-4 flex items-center gap-4 hover:border-primary/20 transition-colors animate-fade-in"
-                  >
-                    <div className={`p-2 rounded-lg ${tx.type === "income" ? "income-bg" : "expense-bg"}`}>
-                      {tx.type === "income"
-                        ? <ArrowUpRight className="h-5 w-5 income-text" />
-                        : <ArrowDownRight className="h-5 w-5 expense-text" />}
-                    </div>
+                {group.transactions.map((tx) => {
+                  const isLent   = tx.type === "lent";
+                  const isRepaid = tx.type === "repaid";
+                  const isLoan   = isLent || isRepaid;
 
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm truncate">{tx.description}</p>
-                      <p className="text-xs text-muted-foreground">{tx.category}</p>
-                    </div>
+                  // Icon & colour bucket
+                  const iconBg    = isLent   ? "bg-amber-500/15"
+                                  : isRepaid ? "bg-emerald-500/15"
+                                  : tx.type === "income" ? "income-bg" : "expense-bg";
+                  const IconEl    = isLoan
+                    ? <HandCoins className={`h-5 w-5 ${isLent ? "text-amber-500" : "text-emerald-500"}`} />
+                    : tx.type === "income"
+                    ? <ArrowUpRight className="h-5 w-5 income-text" />
+                    : <ArrowDownRight className="h-5 w-5 expense-text" />;
 
-                    <p className={`font-mono font-semibold text-sm ${tx.type === "income" ? "income-text" : "expense-text"}`}>
-                      {tx.type === "income" ? "+" : "-"}{formatCurrency(tx.amount)}
-                    </p>
+                  // Primary label
+                  const label = isLent
+                    ? `Loan to: ${tx.borrowerName ?? "friend"}`
+                    : isRepaid
+                    ? `Repayment from: ${tx.borrowerName ?? "friend"}`
+                    : tx.description;
 
-                    <div className="flex gap-1">
-                      <Button
-                        variant="ghost" size="icon"
-                        className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                        onClick={() => setEditTx(tx)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost" size="icon"
-                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                        onClick={() => setDeleteTxId(tx.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                  // Sub-label: status badge for LENT, "Repayment" for REPAID, category otherwise
+                  const BADGE_STYLES: Record<string, string> = {
+                    PENDING:           "bg-amber-500/15 text-amber-600 dark:text-amber-400",
+                    PARTIALLY_REPAID:  "bg-blue-500/15 text-blue-600 dark:text-blue-400",
+                    FULLY_REPAID:      "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
+                    OVERDUE:           "bg-red-500/15 text-red-600 dark:text-red-400",
+                    WRITTEN_OFF:       "bg-zinc-500/15 text-zinc-500",
+                  };
+                  const BADGE_LABELS: Record<string, string> = {
+                    PENDING:           "Pending",
+                    PARTIALLY_REPAID:  "Partial",
+                    FULLY_REPAID:      "Repaid",
+                    OVERDUE:           "Overdue",
+                    WRITTEN_OFF:       "Written off",
+                  };
+
+                  // Amount sign & colour
+                  const amtClass = isRepaid || tx.type === "income" ? "income-text" : "expense-text";
+                  const sign     = isRepaid || tx.type === "income" ? "+" : "-";
+
+                  return (
+                    <div
+                      key={tx.id}
+                      className="glass-card p-4 flex items-center gap-4 hover:border-primary/20 transition-colors animate-fade-in"
+                    >
+                      <div className={`p-2 rounded-lg ${iconBg}`}>{IconEl}</div>
+
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm truncate">{label}</p>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          {isLent && tx.loanStatus ? (
+                            <span className={`inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
+                              BADGE_STYLES[tx.loanStatus] ?? "bg-muted text-muted-foreground"
+                            }`}>
+                              {BADGE_LABELS[tx.loanStatus] ?? tx.loanStatus}
+                            </span>
+                          ) : isRepaid ? (
+                            <span className="text-xs text-muted-foreground">Loan Repayment</span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">{tx.category}</span>
+                          )}
+                        </div>
+                      </div>
+
+                      <p className={`font-mono font-semibold text-sm shrink-0 ${amtClass}`}>
+                        {sign}{formatCurrency(tx.amount)}
+                      </p>
+
+                      <div className="flex gap-1">
+                        <Button
+                          variant="ghost" size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                          onClick={() => setEditTx(tx)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost" size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                          onClick={() => setDeleteTxId(tx.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ))}
 

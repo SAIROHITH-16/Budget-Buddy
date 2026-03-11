@@ -10,7 +10,7 @@ export interface Transaction {
   dueDate?: string;
   repaidAmount?: number;
   remainingAmount?: number;
-  loanStatus?: "PENDING" | "PARTIALLY_REPAID" | "FULLY_REPAID" | "OVERDUE";
+  loanStatus?: "PENDING" | "PARTIALLY_REPAID" | "FULLY_REPAID" | "OVERDUE" | "WRITTEN_OFF";
 }
 
 /**

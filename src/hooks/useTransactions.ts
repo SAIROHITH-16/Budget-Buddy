@@ -76,7 +76,7 @@ export interface TransactionFilters {
   limit?:     number;
   search?:    string;
   category?:  string;
-  type?:      "income" | "expense" | "";
+  type?:      "income" | "expense" | "lent" | "repaid" | "";
   startDate?: string;
   endDate?:   string;
 }
