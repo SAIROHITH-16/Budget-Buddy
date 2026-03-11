@@ -97,68 +97,48 @@ const Dashboard = () => {
   }, []);
 
   // -------------------------------------------------------------------------
-  // Transaction totals — sign-first accumulator.
+  // Transaction totals — strict type-based bucketing.
   //
-  // classify(tx) — priority order:
-  //   1. Raw amount starts with "-"                     → "withdrawal"
-  //   2. Raw amount starts with "+"                     → "deposit"
-  //   3. tx.type is "expense" | "debit" | "dr"         → "withdrawal"
-  //   4. tx.type is "income"  | "credit" | "cr"        → "deposit"
-  //   5. tx.withdrawal column is a positive number      → "withdrawal"
-  //   6. tx.deposit   column is a positive number       → "deposit"
-  //   7. fallback                                       → "deposit"
+  // Each transaction is bucketed into exactly one of the four known types.
+  // LENT and REPAID are tracked separately so they never inflate the
+  // standard Income / Expense figures shown on the stat cards.
   //
-  // Dedup: keyed by tx.id so two legitimately identical transactions that have
-  // distinct IDs are both counted; only true duplicate rows (same id) are skipped.
+  //   walletBalance = (income + repaid) − (expense + lentOut)
+  //   currentlyPending = lentOut − repaid  (net money still with friends)
+  //
+  // Dedup: keyed by tx.id so identical content with distinct IDs is kept;
+  // only true duplicate rows (same id) are skipped.
   // Zero-amount rows are always skipped.
   // -------------------------------------------------------------------------
-  const { totalDeposits, totalWithdrawals, netFlow } = useMemo(() => {
-    let deposits    = 0;
-    let withdrawals = 0;
-    const seen      = new Set<string>();
+  const { totalIncome, totalExpense, totalLentOut, totalRepaid, walletBalance, currentlyPending } = useMemo(() => {
+    let income  = 0;
+    let expense = 0;
+    let lentOut = 0;
+    let repaid  = 0;
+    const seen  = new Set<string>();
 
     transactions.forEach((tx) => {
-      // Dedup by id — fall back to a content key only when id is absent
       const key = String(tx.id ?? `${tx.date}-${tx.description}-${tx.amount}`);
       if (seen.has(key)) return;
       seen.add(key);
 
-      // Resolve the numeric amount from whichever column is populated
-      const rawStr = String(tx.amount ?? "").trim();
-      const cleaned = rawStr.replace(/,/g, "");
-      const parsed  = parseFloat(cleaned);
-      const amt     = isNaN(parsed) ? 0 : Math.abs(parsed);
-      if (amt === 0) return;                           // skip zero-amount rows
+      const amt = Math.abs(parseFloat(String(tx.amount ?? "0").replace(/,/g, "")));
+      if (!isFinite(amt) || amt === 0) return;
 
-      // ── classify ──────────────────────────────────────────────────────────
-      const typeLower = (tx.type ?? "").toLowerCase().trim();
-
-      // Rules 1 & 2 — explicit sign on raw string takes full priority
-      if (cleaned.startsWith("-")) { withdrawals += amt; return; }
-      if (cleaned.startsWith("+")) { deposits    += amt; return; }
-
-      // Rules 3 & 4 — type field
-      if (typeLower === "expense" || typeLower === "debit" || typeLower === "dr") {
-        withdrawals += amt; return;
-      }
-      if (typeLower === "income" || typeLower === "credit" || typeLower === "cr") {
-        deposits += amt; return;
-      }
-
-      // Rules 5 & 6 — dedicated withdrawal / deposit columns (bank CSV exports)
-      const wCol = parseFloat(String((tx as unknown as Record<string, unknown>).withdrawal ?? "0").replace(/,/g, ""));
-      const dCol = parseFloat(String((tx as unknown as Record<string, unknown>).deposit   ?? "0").replace(/,/g, ""));
-      if (!isNaN(wCol) && wCol > 0) { withdrawals += Math.abs(wCol); return; }
-      if (!isNaN(dCol) && dCol > 0) { deposits    += Math.abs(dCol); return; }
-
-      // Rule 7 — safe fallback
-      deposits += amt;
+      const t = (tx.type ?? "").toLowerCase().trim();
+      if      (t === "income")  income  += amt;
+      else if (t === "expense") expense += amt;
+      else if (t === "lent")    lentOut += amt;
+      else if (t === "repaid")  repaid  += amt;
     });
 
     return {
-      totalDeposits:    deposits,
-      totalWithdrawals: withdrawals,
-      netFlow:          deposits - withdrawals,
+      totalIncome:      income,
+      totalExpense:     expense,
+      totalLentOut:     lentOut,
+      totalRepaid:      repaid,
+      walletBalance:    (income + repaid) - (expense + lentOut),
+      currentlyPending: lentOut - repaid,
     };
   }, [transactions]);
 
@@ -240,19 +220,21 @@ const Dashboard = () => {
   // Budget calculations
   //   spendPercent  → how full the progress bar should be (0–100, capped)
   //   spentRatio    → raw ratio for alert logic (can exceed 100)
-  //   isOverLimit   → totalWithdrawals >= monthlyLimit (red)
+  //   isOverLimit   → totalExpense >= monthlyLimit (red)
   //   isOverAlert   → spend% >= alertThreshold but still under limit (yellow)
   // -------------------------------------------------------------------------
+  // Budget progress is based on pure expenses only (LENT is not spending)
   const hasLimit      = budget.monthlyLimit > 0;
-  const spentRatio    = hasLimit ? (totalWithdrawals / budget.monthlyLimit) * 100 : 0;
+  const spentRatio    = hasLimit ? (totalExpense / budget.monthlyLimit) * 100 : 0;
   const spendPercent  = Math.min(spentRatio, 100);
-  const isOverLimit   = hasLimit && totalWithdrawals >= budget.monthlyLimit;
+  const isOverLimit   = hasLimit && totalExpense >= budget.monthlyLimit;
   const isOverAlert   = hasLimit && !isOverLimit && spentRatio >= budget.alertThreshold;
 
   // Formatted display strings — used in stat cards
-  const fmtDeposits    = formatCurrency(totalDeposits);
-  const fmtWithdrawals = formatCurrency(totalWithdrawals);
-  const fmtNetFlow     = (netFlow >= 0 ? "+" : "") + formatCurrency(netFlow);
+  const fmtIncome          = formatCurrency(totalIncome);
+  const fmtExpense         = formatCurrency(totalExpense);
+  const fmtWalletBalance   = (walletBalance >= 0 ? "+" : "") + formatCurrency(walletBalance);
+  const fmtPending         = formatCurrency(Math.max(currentlyPending, 0));
 
   // Progress bar indicator colour
   const progressColor = isOverLimit
@@ -279,7 +261,7 @@ const Dashboard = () => {
             <div>
               <p className="text-sm font-semibold">Budget exceeded!</p>
               <p className="text-xs mt-0.5">
-                You've spent {fmtWithdrawals} — {formatCurrency(totalWithdrawals - budget.monthlyLimit)} over
+                You've spent {fmtExpense} — {formatCurrency(totalExpense - budget.monthlyLimit)} over
                 your {formatCurrency(budget.monthlyLimit)} limit.
               </p>
             </div>
@@ -292,7 +274,7 @@ const Dashboard = () => {
             <div>
               <p className="text-sm font-semibold">Approaching your budget limit</p>
               <p className="text-xs mt-0.5">
-                You've used {Math.round(spentRatio)}% ({fmtWithdrawals}) of your{" "}
+                You've used {Math.round(spentRatio)}% ({fmtExpense}) of your{" "}
                 {formatCurrency(budget.monthlyLimit)} monthly limit.
               </p>
             </div>
@@ -314,27 +296,28 @@ const Dashboard = () => {
         {/* ------------------------------------------------------------------ */}
         {/* Stat cards                                                          */}
         {/* ------------------------------------------------------------------ */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {loading ? (
             <>
+              <Skeleton className="h-28 rounded-xl" />
               <Skeleton className="h-28 rounded-xl" />
               <Skeleton className="h-28 rounded-xl" />
               <Skeleton className="h-28 rounded-xl" />
             </>
           ) : (
             <>
-              {/* Card 1: Money In (Total Deposits) */}
+              {/* Card 1: Total Income — pure income transactions only */}
               <StatCard
-                title="Money In"
-                value={fmtDeposits}
+                title="Total Income"
+                value={fmtIncome}
                 icon={<TrendingUp className="h-5 w-5 income-text" />}
                 variant="income"
               />
 
-              {/* Card 2: Money Out (Total Withdrawals) — embeds budget progress bar */}
+              {/* Card 2: Total Expenses — pure expense transactions only, budget bar */}
               <StatCard
-                title="Money Out"
-                value={fmtWithdrawals}
+                title="Total Expenses"
+                value={fmtExpense}
                 icon={<TrendingDown className="h-5 w-5 expense-text" />}
                 variant="expense"
               >
@@ -346,20 +329,34 @@ const Dashboard = () => {
                       indicatorClassName={progressColor}
                     />
                     <p className="text-xs text-muted-foreground tabular-nums">
-                      {fmtWithdrawals} / {formatCurrency(budget.monthlyLimit)}
+                      {fmtExpense} / {formatCurrency(budget.monthlyLimit)}
                       {" "}({Math.round(spentRatio)}%)
                     </p>
                   </div>
                 )}
               </StatCard>
 
-              {/* Card 3: Net Cash Flow — green (+) when positive, red when negative */}
+              {/* Card 3: Wallet Balance = (income + repaid) − (expense + lent) */}
               <StatCard
-                title="Net Cash Flow"
-                value={fmtNetFlow}
-                icon={<Wallet className={`h-5 w-5 ${netFlow >= 0 ? "income-text" : "expense-text"}`} />}
-                valueClassName={netFlow >= 0 ? "income-text" : "expense-text"}
+                title="Wallet Balance"
+                value={fmtWalletBalance}
+                icon={<Wallet className={`h-5 w-5 ${walletBalance >= 0 ? "income-text" : "expense-text"}`} />}
+                valueClassName={walletBalance >= 0 ? "income-text" : "expense-text"}
               />
+
+              {/* Card 4: Money Lending — net amount currently with friends */}
+              <StatCard
+                title="Money Lending"
+                value={fmtPending}
+                icon={<HandCoins className="h-5 w-5 text-amber-500" />}
+                valueClassName="text-amber-500"
+              >
+                <p className="text-xs text-muted-foreground">
+                  {currentlyPending > 0
+                    ? `${fmtPending} out with friends`
+                    : "All settled up"}
+                </p>
+              </StatCard>
             </>
           )}
         </div>

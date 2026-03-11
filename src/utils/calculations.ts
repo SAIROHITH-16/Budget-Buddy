@@ -39,6 +39,32 @@ export function calculateBalance(transactions: Transaction[]): number {
   return calculateTotalIncome(transactions) - calculateTotalExpense(transactions);
 }
 
+/** Sum of all LENT transactions (money given out to friends). */
+export function calculateTotalLent(transactions: Transaction[]): number {
+  return transactions
+    .filter((t) => t.type === "lent")
+    .reduce((sum, t) => sum + safeAmount(t), 0);
+}
+
+/** Sum of all REPAID transactions (money returned by friends). */
+export function calculateTotalRepaid(transactions: Transaction[]): number {
+  return transactions
+    .filter((t) => t.type === "repaid")
+    .reduce((sum, t) => sum + safeAmount(t), 0);
+}
+
+/**
+ * True wallet balance including lending activity:
+ *   (income + repaid) − (expense + lent)
+ */
+export function calculateWalletBalance(transactions: Transaction[]): number {
+  const income  = calculateTotalIncome(transactions);
+  const expense = calculateTotalExpense(transactions);
+  const lent    = calculateTotalLent(transactions);
+  const repaid  = calculateTotalRepaid(transactions);
+  return (income + repaid) - (expense + lent);
+}
+
 export function getCategoryDistribution(transactions: Transaction[]) {
   const map: Record<string, number> = {};
   transactions.forEach((t) => {
