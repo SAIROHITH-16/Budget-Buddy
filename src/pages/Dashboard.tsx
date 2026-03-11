@@ -14,7 +14,7 @@ import {
   formatCurrency,
   type Transaction,
 } from "@/utils/calculations";
-import { TrendingUp, TrendingDown, Wallet, AlertTriangle, AlertCircle, HandCoins } from "lucide-react";
+import { TrendingUp, TrendingDown, Wallet, AlertTriangle, AlertCircle, HandCoins, Trash2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -43,7 +43,7 @@ interface PendingLoan {
   dueDate: string | null;
   repaidAmount: number;
   remainingAmount: number;
-  loanStatus: "PENDING" | "PARTIALLY_REPAID" | "OVERDUE";
+  loanStatus: "PENDING" | "PARTIALLY_REPAID" | "OVERDUE" | "WRITTEN_OFF";
 }
 
 const Dashboard = () => {
@@ -180,6 +180,10 @@ const Dashboard = () => {
   const [repaySubmitting, setRepaySubmitting]   = useState(false);
   const [repayError, setRepayError]             = useState("");
 
+  // Write-off state
+  const [writeOffTarget, setWriteOffTarget]     = useState<PendingLoan | null>(null);
+  const [writeOffSubmitting, setWriteOffSubmitting] = useState(false);
+
   useEffect(() => {
     let cancelled = false;
     setLoansLoading(true);
@@ -196,6 +200,10 @@ const Dashboard = () => {
     if (!repayTarget) return;
     const amt = Number(repayAmount);
     if (isNaN(amt) || amt <= 0) { setRepayError("Enter a valid positive amount."); return; }
+    if (amt > repayTarget.remainingAmount) {
+      setRepayError(`Amount cannot exceed the remaining balance (${formatCurrency(repayTarget.remainingAmount)}).`);
+      return;
+    }
     setRepaySubmitting(true);
     setRepayError("");
     try {
@@ -209,6 +217,22 @@ const Dashboard = () => {
       setRepayError("Failed to record repayment. Please try again.");
     } finally {
       setRepaySubmitting(false);
+    }
+  };
+
+  const handleWriteOffConfirm = async () => {
+    if (!writeOffTarget) return;
+    setWriteOffSubmitting(true);
+    try {
+      await api.patch(`/loans/${writeOffTarget.id}/write-off`);
+      // Remove from the visible list immediately
+      setPendingLoans((prev) => prev.filter((l) => l.id !== writeOffTarget.id));
+      setWriteOffTarget(null);
+    } catch {
+      // On error just close — user can retry
+      setWriteOffTarget(null);
+    } finally {
+      setWriteOffSubmitting(false);
     }
   };
 
@@ -406,14 +430,29 @@ const Dashboard = () => {
                       )}
                     </span>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="shrink-0 text-xs"
-                    onClick={() => { setRepayTarget(loan); setRepayAmount(""); setRepayError(""); }}
-                  >
-                    Mark as Received
-                  </Button>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-xs"
+                      onClick={() => {
+                        setRepayTarget(loan);
+                        setRepayAmount(String(loan.remainingAmount));
+                        setRepayError("");
+                      }}
+                    >
+                      Mark as Received
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                      title="Write off as bad debt"
+                      onClick={() => setWriteOffTarget(loan)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -477,6 +516,50 @@ const Dashboard = () => {
       </div>
 
       {/* -------------------------------------------------------------------- */}
+      {/* Write-Off Confirmation Dialog                                         */}
+      {/* -------------------------------------------------------------------- */}
+      <Dialog open={!!writeOffTarget} onOpenChange={(open) => { if (!open) setWriteOffTarget(null); }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Write Off Bad Debt?</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <p className="text-sm text-muted-foreground">
+              Are you sure you want to write off{" "}
+              <span className="font-medium text-foreground">
+                {formatCurrency(writeOffTarget?.remainingAmount ?? 0)}
+              </span>{" "}
+              owed by{" "}
+              <span className="font-medium text-foreground">
+                {writeOffTarget?.borrowerName ?? "friend"}
+              </span>{" "}
+              as a bad debt expense?
+            </p>
+            <p className="text-xs text-muted-foreground">
+              This will record an expense of that amount and mark the loan as written off.
+              It cannot be undone.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setWriteOffTarget(null)}
+              disabled={writeOffSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleWriteOffConfirm}
+              disabled={writeOffSubmitting}
+            >
+              {writeOffSubmitting ? "Writing off…" : "Yes, Write Off"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* -------------------------------------------------------------------- */}
       {/* Mark-as-Received Dialog                                               */}
       {/* -------------------------------------------------------------------- */}
       <Dialog open={!!repayTarget} onOpenChange={(open) => { if (!open) setRepayTarget(null); }}>
@@ -497,6 +580,7 @@ const Dashboard = () => {
                 type="number"
                 step="0.01"
                 min="0.01"
+                max={repayTarget?.remainingAmount}
                 placeholder="0.00"
                 value={repayAmount}
                 onChange={(e) => { setRepayAmount(e.target.value); setRepayError(""); }}

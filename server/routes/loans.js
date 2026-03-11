@@ -149,10 +149,12 @@ router.post("/repayment", async (req, res) => {
         message: "Loan not found or does not belong to this account.",
       });
     }
-    if (loanRow.loan_status === "FULLY_REPAID") {
+    if (loanRow.loan_status === "FULLY_REPAID" || loanRow.loan_status === "WRITTEN_OFF") {
       return res.status(400).json({
         success: false,
-        message: "This loan has already been fully repaid.",
+        message: loanRow.loan_status === "WRITTEN_OFF"
+          ? "This loan has been written off and cannot accept further repayments."
+          : "This loan has already been fully repaid.",
       });
     }
 
@@ -248,6 +250,117 @@ router.post("/repayment", async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Server error: failed to process repayment.",
+    });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// PATCH /api/loans/:id/write-off
+// Marks an unpaid/partially-paid loan as bad debt and records the write-off
+// as an expense transaction so the wallet balance adjusts automatically.
+//
+// Supabase steps:
+//   Step A — fetch & validate the LENT transaction (must belong to user)
+//   Step B — mark the loan as WRITTEN_OFF
+//   Step C — insert an EXPENSE transaction: "Bad Debt – <borrowerName>"
+//            for the remainingAmount so the wallet balance is debited
+//
+// Response (200):
+//   { success: true, loan: {...}, writeOffTransaction: {...} }
+// ---------------------------------------------------------------------------
+router.patch("/:id/write-off", async (req, res) => {
+  const loanId = req.params.id;
+  const userId = req.user.uid;
+
+  try {
+    const sb = getDb();
+
+    // ── Step A: Fetch & validate ──────────────────────────────────────────────
+    const { data: loanRow, error: fetchErr } = await sb
+      .from("transactions")
+      .select("*")
+      .eq("id",   loanId)
+      .eq("uid",  userId)
+      .eq("type", "lent")
+      .maybeSingle();
+
+    if (fetchErr) throw new Error(`Loan fetch failed: ${fetchErr.message}`);
+
+    if (!loanRow) {
+      return res.status(404).json({
+        success: false,
+        message: "Loan not found or does not belong to this account.",
+      });
+    }
+    if (loanRow.loan_status === "FULLY_REPAID") {
+      return res.status(400).json({
+        success: false,
+        message: "This loan is already fully repaid — nothing to write off.",
+      });
+    }
+    if (loanRow.loan_status === "WRITTEN_OFF") {
+      return res.status(400).json({
+        success: false,
+        message: "This loan has already been written off.",
+      });
+    }
+
+    const remainingAmount = Number(loanRow.remaining_amount) ?? Number(loanRow.amount) ?? 0;
+
+    if (remainingAmount <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No remaining balance to write off.",
+      });
+    }
+
+    // ── Step B: Mark the loan as WRITTEN_OFF ──────────────────────────────────
+    const { data: updatedLoanRow, error: updateErr } = await sb
+      .from("transactions")
+      .update({ loan_status: "WRITTEN_OFF" })
+      .eq("id", loanId)
+      .select()
+      .single();
+
+    if (updateErr) throw new Error(`Write-off update failed: ${updateErr.message}`);
+
+    // ── Step C: Insert a BAD DEBT expense transaction ─────────────────────────
+    // This debits the wallet by the written-off amount, keeping the balance
+    // consistent with the derived formula: Σ(income + repaid) − Σ(expense + lent).
+    const borrower = loanRow.borrower_name || "Unknown";
+    const today    = new Date().toISOString().substring(0, 10);
+
+    const { data: writeOffRow, error: insertErr } = await sb
+      .from("transactions")
+      .insert({
+        id:             randomUUID(),
+        uid:            userId,
+        type:           "expense",
+        amount:         remainingAmount,
+        category:       "Bad Debt",
+        description:    `Loan write-off: ${borrower}`,
+        date:           today,
+        needs_review:   false,
+        ai_categorized: false,
+        borrower_name:  loanRow.borrower_name || null,
+        loan_status:    null,
+      })
+      .select()
+      .single();
+
+    if (insertErr) throw new Error(`Write-off expense insert failed: ${insertErr.message}`);
+
+    return res.status(200).json({
+      success:             true,
+      loan:                loanFromRow(updatedLoanRow),
+      writeOffTransaction: loanFromRow(writeOffRow),
+    });
+
+  } catch (err) {
+    console.error("[PATCH /loans/:id/write-off] Error:", err.message);
+    return res.status(500).json({
+      success: false,
+      message: "Server error: failed to write off loan.",
     });
   }
 });
