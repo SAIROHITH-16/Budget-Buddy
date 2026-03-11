@@ -259,25 +259,27 @@ router.get("/pending", async (req, res) => {
 
 // ---------------------------------------------------------------------------
 // POST /api/transactions/import
-// Import an array of bank-CSV transactions into the review queue.
+// Import an array of parsed bank-statement transactions into the review queue.
 //
 // ⚠️  Must be defined before /:id.
 //
 // Every imported transaction is flagged needsReview:true so the user can
 // review and add personal descriptions at the end of the day.
 //
-// Duplicate handling — "upsert-on-insert" strategy with bulkWrite:
-//   Each operation targets { uid, bankReferenceId }.  If a document with
-//   that pair already exists it is left completely untouched ($setOnInsert
-//   only runs on a real insert, never on an update).  This means:
-//     • Re-uploading the same statement produces 0 new documents.
-//     • A user who has already reviewed a duplicate is not overwritten.
+// Duplicate detection — content-based "bouncer" strategy:
+//   Before inserting, all existing transactions for this user within the
+//   date window of the incoming batch are fetched from Supabase. A new row
+//   is considered a duplicate when ALL THREE of the following match an
+//   existing row:
+//     • amount  — exact numeric equality
+//     • date    — normalised to YYYY-MM-DD (strips any time component)
+//     • description — trimmed and lowercased
+//   This works for AI-parsed statements that produce no bankReferenceId.
 //
 // Request body:
 //   {
 //     "transactions": [
 //       {
-//         "bankReferenceId": "TXN-20260224-001",  // required for dedup
 //         "type":        "expense",
 //         "amount":      45.00,
 //         "category":    "Groceries",
@@ -289,7 +291,7 @@ router.get("/pending", async (req, res) => {
 //   }
 //
 // Response (201):
-//   { inserted: 3, duplicates: 2, total: 5 }
+//   { success: true, insertedCount: 3, skippedCount: 2, message: "Import complete." }
 // ---------------------------------------------------------------------------
 router.post("/import", async (req, res) => {
   const { transactions } = req.body;
@@ -311,18 +313,11 @@ router.post("/import", async (req, res) => {
   }
 
   // ── 2. Per-row pre-validation ────────────────────────────────────────────
-  const validDocs  = [];  // plain doc objects ready to insert
-  const rowErrors  = [];
+  const validDocs = [];   // plain doc objects, ready to check & insert
+  const rowErrors = [];
 
   transactions.forEach((item, index) => {
     const rowNum = index + 1;
-
-    // bankReferenceId is required for the dedup guarantee
-    if (!item.bankReferenceId || typeof item.bankReferenceId !== "string") {
-      rowErrors.push({ row: rowNum, errors: ["bankReferenceId is required for import"] });
-      return;
-    }
-
     const errs = validateRow(item);
     if (errs.length > 0) {
       rowErrors.push({ row: rowNum, errors: errs });
@@ -330,18 +325,17 @@ router.post("/import", async (req, res) => {
     }
 
     validDocs.push({
-      uid:             req.user.uid,
-      bankReferenceId: item.bankReferenceId.trim(),
-      type:            item.type,
-      amount:          Number(item.amount),
-      category:        item.category?.trim() || "Uncategorized",
-      description:     item.description?.trim() || "Imported transaction",
-      date:            item.date,
-      needsReview:     true,
+      uid:          req.user.uid,
+      type:         item.type,
+      amount:       Number(item.amount),
+      category:     item.category?.trim()    || "Uncategorized",
+      description:  item.description?.trim() || "Imported transaction",
+      date:         String(item.date).substring(0, 10),   // normalised to YYYY-MM-DD
+      needs_review: true,
+      ai_categorized: false,
     });
   });
 
-  // Reject the entire batch if any row failed pre-validation
   if (rowErrors.length > 0) {
     return res.status(400).json({
       success: false,
@@ -363,7 +357,8 @@ router.post("/import", async (req, res) => {
       uncategorisedIndices.forEach((docIdx, pos) => {
         const predicted = aiCategories[pos];
         if (predicted && predicted !== "Uncategorized") {
-          validDocs[docIdx].category = predicted;
+          validDocs[docIdx].category      = predicted;
+          validDocs[docIdx].ai_categorized = true;
         }
       });
     }
@@ -371,23 +366,67 @@ router.post("/import", async (req, res) => {
     console.warn("[POST /import] AI categorization failed, proceeding without:", aiErr.message);
   }
 
-  // ── 4. Dedup-aware insert ─────────────────────────────────────────────────
+  // ── 4. Bouncer — fetch existing rows within the date window ───────────────
   try {
-    const allRefIds   = validDocs.map((d) => d.bankReferenceId);
-    const existingSet = await db.existingRefIds(TX_COLL, req.user.uid, allRefIds);
+    const sb = require("../lib/db").getDb();
 
-    const newDocs    = validDocs.filter((d) => !existingSet.has(d.bankReferenceId));
-    const duplicates = validDocs.length - newDocs.length;
-    let   inserted   = 0;
+    // Determine the min/max date across the incoming batch for an efficient
+    // range query — no need to pull the entire transaction history.
+    const dates    = validDocs.map((d) => d.date).sort();
+    const minDate  = dates[0];
+    const maxDate  = dates[dates.length - 1];
 
-    if (newDocs.length > 0) {
-      const result = await db.insertMany(TX_COLL, newDocs);
-      inserted = result.length;
+    const { data: existingRows, error: fetchErr } = await sb
+      .from("transactions")
+      .select("amount, date, description")
+      .eq("uid", req.user.uid)
+      .gte("date", minDate)
+      .lte("date", maxDate);
+
+    if (fetchErr) throw new Error(`Dedup fetch failed: ${fetchErr.message}`);
+
+    // Build a Set of "<amount>|<date>|<description>" fingerprints from existing rows.
+    const existingFingerprints = new Set(
+      (existingRows || []).map((row) =>
+        `${Number(row.amount)}|${String(row.date).substring(0, 10)}|${String(row.description).trim().toLowerCase()}`
+      )
+    );
+
+    // Keep only rows whose fingerprint is not already in Supabase.
+    const newTransactionsToInsert = validDocs.filter((doc) => {
+      const fp = `${doc.amount}|${doc.date}|${doc.description.trim().toLowerCase()}`;
+      return !existingFingerprints.has(fp);
+    });
+
+    const skippedCount  = validDocs.length - newTransactionsToInsert.length;
+    let   insertedCount = 0;
+
+    // ── 5. Insert only the non-duplicate rows ────────────────────────────────
+    if (newTransactionsToInsert.length > 0) {
+      // Attach a fresh UUID to each row (Supabase needs id when inserting via service role)
+      const { randomUUID } = require("crypto");
+      const rowsToInsert = newTransactionsToInsert.map((doc) => ({
+        id: randomUUID(),
+        ...doc,
+      }));
+
+      const { error: insertErr } = await sb
+        .from("transactions")
+        .insert(rowsToInsert);
+
+      if (insertErr) throw new Error(`Batch insert failed: ${insertErr.message}`);
+      insertedCount = rowsToInsert.length;
     }
 
-    return res.status(201).json({ success: true, inserted, duplicates, total: validDocs.length });
+    return res.status(201).json({
+      success:       true,
+      insertedCount,
+      skippedCount,
+      message:       "Import complete.",
+    });
+
   } catch (error) {
-    console.error("[POST /transactions/import] Error:", error);
+    console.error("[POST /transactions/import] Error:", error.message);
     return res.status(500).json({
       success: false,
       message: "Server error: bulk import failed.",
