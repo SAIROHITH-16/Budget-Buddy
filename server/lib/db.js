@@ -172,10 +172,9 @@ async function updateOne(coll, filter, update) {
 }
 
 async function findOneAndUpdate(coll, filter, update) {
-  const setRow = toRow(update.$set || update);
-  const existing = db.prepare(`SELECT id FROM ${coll} ${clause} LIMIT 1`).get(...params);
+  const existing = await findOne(coll, filter);
   if (!existing) return null;
-  const setRow   = toRow(update.$set || update);
+  const setRow = toRow(update.$set || update);
   let q = supabase.from(coll).update(setRow);
   q = applyFilter(q, filter);
   const { data, error } = await q.select().maybeSingle();
