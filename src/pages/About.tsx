@@ -135,28 +135,35 @@ export default function About() {
             </p>
           </div>
 
-          {/* 3-column step grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {ENGINE_STEPS.map((s) => (
-              <Card
-                key={s.step}
-                className={`
-                  relative overflow-hidden
-                  bg-white/70 backdrop-blur-xl
-                  border ${s.border} ${s.glow}
-                  hover:shadow-xl hover:bg-white/90
-                  transition-all duration-300
+          {/* Centered 2-over-3 Flex Grid */}
+          <div className="flex flex-wrap items-stretch justify-center gap-6 mx-auto w-full max-w-7xl">
+            {ENGINE_STEPS.map((s, index) => {
+              const widthClasses = index < 2 
+                ? "w-full md:w-[calc(50%-0.75rem)] lg:w-[45%]" 
+                : "w-full md:w-[calc(50%-0.75rem)] lg:w-[30%]";
+
+              return (
+                <Card
+                  key={s.step}
+                  className={`
+                    ${widthClasses}
+                    relative overflow-hidden flex flex-col
+                  bg-white/40 backdrop-blur-md
+                  border border-white/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)]
+                  hover:shadow-[0_20px_40px_rgb(0,0,0,0.08)] hover:-translate-y-2 hover:scale-[1.02] hover:bg-white/60
+                  transition-all duration-300 ease-out
+                  ${s.border} ${s.glow}
                 `}
               >
                 {/* Large faded step number */}
                 <span
-                  className="absolute top-3 right-5 text-7xl font-black text-slate-100 select-none leading-none"
+                  className="absolute top-6 right-6 text-7xl font-black text-slate-900/[0.04] select-none leading-none z-0"
                   aria-hidden="true"
                 >
                   {s.step}
                 </span>
 
-                <CardHeader className="pb-2 relative z-10">
+                <CardHeader className="p-6 pb-3 relative z-10">
                   <div className="flex items-center gap-3">
                     <span className="text-3xl">{s.icon}</span>
                     <CardTitle className={`text-xl font-bold ${s.accent}`}>
@@ -165,18 +172,19 @@ export default function About() {
                   </div>
                 </CardHeader>
 
-                <CardContent className="relative z-10">
+                <CardContent className="p-6 pt-2 relative z-10 flex-grow">
                   <p className="text-slate-600 leading-relaxed text-sm sm:text-base">
                     {s.body}
                   </p>
                 </CardContent>
               </Card>
-            ))}
+            );
+          })}
           </div>
         </section>
 
         {/* ================================================================ */}
-        {/* 3. Technical Architecture                                        */
+        {/* 3. Technical Architecture                                        */}
         {/* ================================================================ */}
         <section className="space-y-10">
           <div className="text-center space-y-3">
