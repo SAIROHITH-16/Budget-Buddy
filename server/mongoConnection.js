@@ -33,20 +33,21 @@ if (!MONGODB_URI) {
 const mongooseOptions = {
   // Automatically create indexes defined in schemas
   autoIndex: true,
-  
+
   // Server selection timeout (how long to wait for MongoDB to respond)
-  serverSelectionTimeoutMS: 30000,  // 30 seconds (increased from 10)
-  
+  // FAILS FAST IN 5 SECONDS instead of hanging for 30s
+  serverSelectionTimeoutMS: 5000,
+
   // Socket timeout (how long a send or receive on a socket can take)
-  socketTimeoutMS: 75000,  // 75 seconds
-  
+  socketTimeoutMS: 45000,  // 45 seconds
+
   // Connection pool settings
   maxPoolSize: 10,
   minPoolSize: 2,
-  
+
   // Retry writes
   retryWrites: true,
-  
+
   // Retry reads
   retryReads: true,
 };
@@ -62,8 +63,22 @@ mongoose.connect(MONGODB_URI, mongooseOptions)
     console.log(`[MongoDB] Database: ${mongoose.connection.name}`);
   })
   .catch((err) => {
-    console.error("[MongoDB] Initial connection error:", err.message);
-    console.error("[MongoDB] Full error:", err);
+    console.error("\n❌ [MongoDB] FATAL: INITIAL CONNECTION FAILED ❌");
+    console.error("Error Message:", err.message);
+    console.error("\n--- 🔍 DIAGNOSTICS 🔍 ---");
+    if (err.message.includes('IP') || err.message.includes('whitelist') || err.message.includes('bad auth')) {
+      console.error("👉 IP WHITELISTING ISSUE: This server's IP address is not whitelisted in MongoDB Atlas.");
+      console.error("👉 FIX: Go to Atlas -> Security -> Network Access -> Add IP Address -> Add 0.0.0.0/0");
+    } else if (err.message.includes('authentication') || err.message.includes('auth')) {
+      console.error("👉 AUTHENTICATION ISSUE: Invalid username or password in MONGODB_URI.");
+      console.error("👉 FIX: Check Database Access settings in Atlas and verify credentials in Render dashboard.");
+    } else if (err.message.includes('timeout') || err.message.includes('ETIMEOUT')) {
+      console.error("👉 TIMEOUT ISSUE: Cannot reach the database cluster.");
+      console.error("👉 FIX: Verify cluster is ACTIVE, and verify IP is whitelisted (0.0.0.0/0).");
+    } else {
+      console.error("👉 UNKNOWN ISSUE: Check if URI is perfectly formatted.");
+    }
+    console.error("--------------------------\n");
     // Don't exit — let the app continue, but log the error clearly
   });
 

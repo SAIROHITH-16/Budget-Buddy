@@ -1,4 +1,4 @@
-﻿// src/pages/About.tsx
+// src/pages/About.tsx
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Github, Linkedin, ExternalLink, Mail } from "lucide-react";
@@ -131,13 +131,12 @@ export default function About() {
               The Intelligent Engine
             </h2>
             <p className="text-slate-600 max-w-2xl mx-auto">
-              Five precision-engineered stages that turn raw bank data into an
-              unimpeachable financial ledger.
+              Sophisticated logic that automates your financial tracking.
             </p>
           </div>
 
-          {/* 2×2 step grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* 3-column step grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {ENGINE_STEPS.map((s) => (
               <Card
                 key={s.step}
@@ -223,7 +222,7 @@ export default function About() {
         </section>
 
         {/* ================================================================ */}
-        {/* 5. Meet the Developer                                            */}
+        {/* 4. Meet the Developer                                            */}
         {/* ================================================================ */}
         <section className="space-y-10">
           <div className="text-center space-y-3">
@@ -308,7 +307,7 @@ export default function About() {
         </section>
 
         {/* ================================================================ */}
-        {/* 6. Footer CTA                                                    */}
+        {/* 5. Footer CTA                                                    */}
         {/* ================================================================ */}
         <section className="text-center space-y-6 py-8 border-t border-violet-100">
           <div className="space-y-3">
