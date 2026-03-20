@@ -241,13 +241,12 @@ export function ProfileSettings() {
               </div>
 
               <Button
-                variant="outline"
                 onClick={handleResetPassword}
                 disabled={resetSending || resetSent}
                 className={`w-full sm:w-auto gap-2 font-semibold transition-all ${
                   resetSent
                     ? "border-green-500 text-green-700 bg-green-50 hover:bg-green-50 dark:bg-green-900/20"
-                    : "hover:border-primary hover:text-primary"
+                    : ""
                 }`}
               >
                 {resetSending ? (

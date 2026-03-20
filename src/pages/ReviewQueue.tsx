@@ -101,18 +101,23 @@ export default function ReviewQueue() {
 
   async function handleApprove(tx: PendingTransaction) {
     const state = getCardState(tx);
-    setApprovingId(tx.id);
+    
+    // Optimistic UI: Remove from list immediately
+    removeFromCache(tx.id);
+    
     try {
       await api.put(`/transactions/${tx.id}`, {
         description: state.description.trim() || tx.description,  // raw bank text fallback
         category:    state.category || tx.category,
         needsReview: false,
       });
-      removeFromCache(tx.id);
     } catch (err) {
       console.error("[ReviewQueue] handleApprove failed:", err);
-    } finally {
-      setApprovingId(null);
+      // Revert optimistic update on error
+      queryClient.setQueryData<PendingTransaction[]>(
+        PENDING_QUERY_KEY,
+        (prev) => [tx, ...(prev ?? [])].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      );
     }
   }
 
@@ -186,7 +191,9 @@ export default function ReviewQueue() {
         {/* ── Transaction cards ── */}
         {!isLoading && transactions.length > 0 && (
           <div className="space-y-4">
-            {transactions.map((tx) => {
+            {transactions.map((tx_raw: any) => {
+              // Extract the ID gracefully in case React Query cache holds stale data forms
+              const tx = { ...tx_raw, id: tx_raw.id || tx_raw._id } as PendingTransaction;
               const state       = getCardState(tx);
               const isApproving = approvingId === tx.id;
 
@@ -313,9 +320,10 @@ export default function ReviewQueue() {
                   variant="outline"
                   size="sm"
                   disabled={approvingId !== null}
-                  onClick={async () => {
+                  onClick={() => {
                     for (const tx of [...transactions]) {
-                      await handleApprove(tx);
+                      // Fire all approvals in parallel without awaiting
+                      handleApprove(tx);
                     }
                   }}
                 >

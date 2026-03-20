@@ -29,8 +29,8 @@ export function usePendingTransactions() {
   return useQuery({
     queryKey: PENDING_QUERY_KEY,
     queryFn: async () => {
-      const { data } = await api.get<PendingTransaction[]>("/transactions/pending");
-      return data;
+      const { data } = await api.get<any[]>("/transactions/pending");
+      return data.map((t) => ({ ...t, id: t._id || t.id })) as PendingTransaction[];
     },
     // Treat the list as fresh for 60 s — prevents the Sidebar from refetching
     // on every page navigation while still picking up newly imported batches.

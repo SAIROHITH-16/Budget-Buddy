@@ -64,8 +64,18 @@ app.use(cors({
   credentials:    true,
 }));
 console.log("[CORS] Allowed origins:", [...ALLOWED_ORIGINS].join(", "), "+ all *.vercel.app + localhost");
+
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+// Health check for uptime monitoring
+app.get('/api/health', (req, res) => {
+  console.log("Health check ping received");
+  return res.status(200).json({ 
+    status: "UP", 
+    timestamp: new Date().toISOString() 
+  });
+});
 app.use((req, _res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`);
   next();
@@ -80,9 +90,6 @@ app.use("/api/parse-pdf",    parsePdfRoutes);
 app.use("/api/users",        userRoutes);
 app.use("/api/loans",        loansRoutes);
 
-app.get("/health", (_req, res) => {
-  res.json({ status: "ok", db: "sqlite", timestamp: new Date().toISOString() });
-});
 
 
 // ---- 404 ----
